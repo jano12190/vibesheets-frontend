@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vibesheets Dashboard</title>
+    <!-- Add Google Fonts to match login -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Add Auth0 SDK for logout functionality -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/auth0-js/9.23.2/auth0.min.js"></script>
+    <!-- Add Google API for logout -->
+    <script src="https://apis.google.com/js/api:client.js"></script>
+    <!-- Link to your CSS file -->
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+    <div class="header">
+        <div class="logo">Vibesheets</div>
+        <div class="user-info">
+            <span id="userDisplay">Loading...</span>
+            <button class="logout-btn" onclick="logout()">↪ Logout</button>
+        </div>
+    </div>
+
+    <div class="dashboard-grid">
+        <div class="card current-time-card">
+            <h2>Current Time</h2>
+            <div class="time-display" id="currentTime">--:--:--</div>
+            <div class="date-display" id="currentDate">Loading...</div>
+            <!-- Both buttons with proper visibility logic -->
+            <button class="clock-in-btn" onclick="clockIn()" id="clockInBtn">Clock In</button>
+            <button class="clock-out-btn" onclick="clockOut()" id="clockOutBtn" style="display: none;">Clock Out</button>
+        </div>
+
+        <div class="card this-month-card">
+            <h2>This Month</h2>
+            <div class="hours-display" id="monthlyHours">0.00h</div>
+            <div class="hours-label">Total Hours</div>
+        </div>
+    </div>
+
+    <div class="card export-card">
+        <h2>Export Timesheet</h2>
+        <div class="export-controls">
+            <label for="periodSelect">Period:</label>
+            <select class="period-select" id="periodSelect" onchange="handlePeriodChange()">
+                <option value="">Select time period</option>
+                <optgroup label="2025 Months">
+                    <!-- Options will be generated dynamically by JavaScript -->
+                </optgroup>
+                <optgroup label="Custom">
+                    <option value="custom">Custom Date Range...</option>
+                </optgroup>
+            </select>
+            <button class="export-btn" onclick="exportPDF()">
+                Export CSV
+            </button>
+        </div>
+        <div class="date-range-inputs" id="dateRangeInputs">
+            <label>From:</label>
+            <input type="date" class="date-input" id="startDate">
+            <label>To:</label>
+            <input type="date" class="date-input" id="endDate">
+        </div>
+    </div>
+
+    <div class="card time-entries-card">
+        <div class="time-entries-header">
+            <h2>Edit Time Entries</h2>
+            <select class="date-filter" id="dateFilter">
+                <option value="all">All dates</option>
+                <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
+                <option value="this-week">This Week</option>
+                <option value="this-month">This Month</option>
+                <option value="specific-date">Specific Date...</option>
+            </select>
+        </div>
+        
+        <div class="date-range-inputs" id="specificDateInput" style="margin-bottom: 20px;">
+            <label>Select Date:</label>
+            <input type="date" class="date-input" id="specificDate" onchange="filterBySpecificDate()">
+        </div>
+
+        <!-- Time entries will be populated dynamically by JavaScript -->
+        <div id="timeEntriesContainer">
+            <div class="loading-entries">Loading time entries...</div>
+        </div>
+    </div>
+
+    <div class="wave"></div>
+
+    <!-- Include authentication module first, then dashboard logic -->
+    <script src="assets/js/dashboard.js"></script>
+
+    <script>
+        // Authentication check and dashboard initialization
+        window.addEventListener('load', async () => {
+            try {
+                console.log('Dashboard page loaded, checking authentication...');
+                
+                // Check if user is authenticated using the vibesheets module
+                if (!window.vibesheets.isAuthenticated()) {
+                    console.log('User not authenticated, redirecting to login...');
+                    window.location.href = '/';
+                    return;
+                }
+                
+                // Get current user and display
+                const user = window.vibesheets.getCurrentUser();
+                const userDisplay = document.getElementById('userDisplay');
+                if (userDisplay && user) {
+                    userDisplay.textContent = user.name || user.nickname || user.email || 'User';
+                }
+                
+                console.log('User authenticated successfully:', user);
+                
+                // Initialize dashboard
+                if (typeof initializeDashboard === 'function') {
+                    await initializeDashboard();
+                } else {
+                    console.error('initializeDashboard function not found');
+                    showError('Dashboard initialization failed: Function not found');
+                }
+                
+            } catch (error) {
+                console.error('Dashboard initialization error:', error);
+                // If there's an auth error, redirect to login
+                if (error.message.includes('Authentication') || error.message.includes('token')) {
+                    console.log('Authentication error detected, redirecting to login...');
+                    window.location.href = '/';
+                } else {
+                    showError('Dashboard initialization failed: ' + error.message);
+                }
+            }
+        });
+        
+        // Logout function using the vibesheets module
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                try {
+                    window.vibesheets.logout();
+                } catch (error) {
+                    console.error('Logout error:', error);
+                    // Fallback: clear storage and redirect manually
+                    localStorage.clear();
+                    window.location.href = '/';
+                }
+            }
+        }
+        
+        // Make logout available globally
+        window.logout = logout;
+        
+        // Error display function for dashboard initialization
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background-color: #e74c3c;
+                color: white;
+                padding: 12px 16px;
+                border-radius: 4px;
+                z-index: 1000;
+                max-width: 400px;
+                font-weight: 500;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            `;
+            errorDiv.textContent = message;
+            document.body.appendChild(errorDiv);
+            
+            // Auto remove after 8 seconds
+            setTimeout(() => {
+                if (errorDiv.parentNode) {
+                    document.body.removeChild(errorDiv);
+                }
+            }, 8000);
+        }
+    </script>
+</body>
+</html>
