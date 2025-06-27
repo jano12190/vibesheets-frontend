@@ -3,6 +3,7 @@ name: Deploy to S3
 on:
   push:
     branches: [ main ]
+  workflow_dispatch: # Allows manual triggering
 
 jobs:
   deploy:
@@ -11,21 +12,78 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+    
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-east-1
-        
-    - name: Sync files to S3
+        aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+    
+    - name: Deploy to S3
       run: |
         # Sync HTML files with proper content type
-        aws s3 sync . s3://vibesheets-app-bucket --delete --exclude ".git/*" --exclude ".github/*" --exclude "*.css" --exclude "*.js" --content-type "text/html"
+        aws s3 sync . s3://${{ secrets.S3_BUCKET_NAME }}/ \
+          --delete \
+          --exclude ".git/*" \
+          --exclude ".github/*" \
+          --exclude "*.css" \
+          --exclude "*.js" \
+          --exclude "README.md" \
+          --exclude "*.md" \
+          --content-type "text/html"
         
         # Sync CSS files with proper content type
-        aws s3 sync . s3://vibesheets-app-bucket --exclude "*" --include "*.css" --content-type "text/css"
+        aws s3 sync . s3://${{ secrets.S3_BUCKET_NAME }}/ \
+          --exclude "*" \
+          --include "*.css" \
+          --content-type "text/css"
         
         # Sync JS files with proper content type
-        aws s3 sync . s3://vibesheets-app-bucket --exclude "*" --include "*.js" --content-type "application/javascript"
+        aws s3 sync . s3://${{ secrets.S3_BUCKET_NAME }}/ \
+          --exclude "*" \
+          --include "*.js" \
+          --content-type "application/javascript"
+        
+        # Set cache control for static assets
+        aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}/ s3://${{ secrets.S3_BUCKET_NAME }}/ \
+          --recursive \
+          --exclude "*" \
+          --include "*.css" \
+          --include "*.js" \
+          --include "*.png" \
+          --include "*.jpg" \
+          --include "*.jpeg" \
+          --include "*.gif" \
+          --include "*.svg" \
+          --include "*.ico" \
+          --include "*.woff" \
+          --include "*.woff2" \
+          --metadata-directive REPLACE \
+          --cache-control "max-age=31536000" \
+          --expires "2025-12-31T23:59:59Z"
+        
+        # Set cache control for HTML files (shorter cache)
+        aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}/ s3://${{ secrets.S3_BUCKET_NAME }}/ \
+          --recursive \
+          --exclude "*" \
+          --include "*.html" \
+          --metadata-directive REPLACE \
+          --cache-control "max-age=300"
+    
+    - name: Invalidate CloudFront
+      run: |
+        aws cloudfront create-invalidation \
+          --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+          --paths "/*"
+        
+    - name: Wait for invalidation to complete
+      run: |
+        echo "Waiting for CloudFront invalidation to complete..."
+        aws cloudfront wait invalidation-completed \
+          --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+          --id $(aws cloudfront list-invalidations \
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --query 'InvalidationList.Items[0].Id' \
+            --output text)
+        echo "CloudFront invalidation completed!"
