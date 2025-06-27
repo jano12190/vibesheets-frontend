@@ -21,4 +21,11 @@ jobs:
         
     - name: Sync files to S3
       run: |
-        aws s3 sync . s3://vibesheets-app-bucket --delete --exclude ".git/*" --exclude ".github/*"
+        # Sync HTML files with proper content type
+        aws s3 sync . s3://vibesheets-app-bucket --delete --exclude ".git/*" --exclude ".github/*" --exclude "*.css" --exclude "*.js" --content-type "text/html"
+        
+        # Sync CSS files with proper content type
+        aws s3 sync . s3://vibesheets-app-bucket --exclude "*" --include "*.css" --content-type "text/css"
+        
+        # Sync JS files with proper content type
+        aws s3 sync . s3://vibesheets-app-bucket --exclude "*" --include "*.js" --content-type "application/javascript"
