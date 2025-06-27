@@ -17,8 +17,8 @@ window.vibesheets = (function() {
         // Auto-detect API Gateway URL based on current domain
         AUTH_API_URL: null, // Will be set automatically
         
-        // Replace with your timesheet API base URL
-        TIMESHEET_API_URL: 'https://3r0khwlvdl.execute-api.us-east-1.amazonaws.com/dev',
+        // Will be auto-detected or set via Terraform outputs
+        TIMESHEET_API_URL: null,
         
         // Auth configuration - will be set dynamically
         REDIRECT_URI: null,
@@ -37,40 +37,49 @@ window.vibesheets = (function() {
             if (storedUrl) {
                 CONFIG.AUTH_API_URL = storedUrl;
                 console.log('Using stored auth API URL:', CONFIG.AUTH_API_URL);
-                return true;
-            }
-            
-            // Auto-detect based on current domain
-            const currentDomain = window.location.hostname;
-            
-            if (currentDomain === 'localhost' || currentDomain === '127.0.0.1') {
-                // Development mode - allow manual configuration
-                console.warn('Development mode detected. Set AUTH_API_URL in localStorage with key "auth_api_url"');
-                
-                // Try common development patterns
-                const devUrls = [
-                    'http://localhost:3000/dev/config',
-                    'http://localhost:8000/config',
-                    'https://tizdl2ywqi.execute-api.us-east-1.amazonaws.com/dev/config'
-                ];
-                
-                // For now, use the AWS endpoint as fallback
-                CONFIG.AUTH_API_URL = 'https://tizdl2ywqi.execute-api.us-east-1.amazonaws.com/dev/config';
-                localStorage.setItem('auth_api_url', CONFIG.AUTH_API_URL);
-                console.log('Using fallback auth API URL:', CONFIG.AUTH_API_URL);
-                
-                return true;
             } else {
-                // Production mode - construct API URL based on your terraform setup
-                // Update this to match your actual API Gateway configuration
-                CONFIG.AUTH_API_URL = `https://tizdl2ywqi.execute-api.us-east-1.amazonaws.com/prod/config`;
-                localStorage.setItem('auth_api_url', CONFIG.AUTH_API_URL);
-                console.log('Auto-detected auth API URL:', CONFIG.AUTH_API_URL);
-                return true;
+                // Auto-detect based on current domain
+                const currentDomain = window.location.hostname;
+                
+                if (currentDomain === 'localhost' || currentDomain === '127.0.0.1') {
+                    // Development mode - use hardcoded endpoint temporarily
+                    CONFIG.AUTH_API_URL = 'https://tizdl2ywqi.execute-api.us-east-1.amazonaws.com/prod/config';
+                    localStorage.setItem('auth_api_url', CONFIG.AUTH_API_URL);
+                    console.log('Development mode - using hardcoded auth API URL:', CONFIG.AUTH_API_URL);
+                } else {
+                    // Production mode - use api subdomain
+                    CONFIG.AUTH_API_URL = `https://api.${currentDomain}/config`;
+                    localStorage.setItem('auth_api_url', CONFIG.AUTH_API_URL);
+                    console.log('Production mode - auto-detected auth API URL:', CONFIG.AUTH_API_URL);
+                }
             }
         }
         
-        return CONFIG.AUTH_API_URL !== null;
+        if (!CONFIG.TIMESHEET_API_URL) {
+            // Try to detect from localStorage first
+            const storedTimesheetUrl = localStorage.getItem('timesheet_api_url');
+            if (storedTimesheetUrl) {
+                CONFIG.TIMESHEET_API_URL = storedTimesheetUrl;
+                console.log('Using stored timesheet API URL:', CONFIG.TIMESHEET_API_URL);
+            } else {
+                // Auto-detect based on current domain
+                const currentDomain = window.location.hostname;
+                
+                if (currentDomain === 'localhost' || currentDomain === '127.0.0.1') {
+                    // Development mode - use hardcoded endpoint temporarily
+                    CONFIG.TIMESHEET_API_URL = 'https://NEW_API_ID.execute-api.us-east-1.amazonaws.com/prod';
+                    localStorage.setItem('timesheet_api_url', CONFIG.TIMESHEET_API_URL);
+                    console.log('Development mode - using placeholder timesheet API URL:', CONFIG.TIMESHEET_API_URL);
+                } else {
+                    // Production mode - use api subdomain
+                    CONFIG.TIMESHEET_API_URL = `https://api.${currentDomain}`;
+                    localStorage.setItem('timesheet_api_url', CONFIG.TIMESHEET_API_URL);
+                    console.log('Production mode - auto-detected timesheet API URL:', CONFIG.TIMESHEET_API_URL);
+                }
+            }
+        }
+        
+        return CONFIG.AUTH_API_URL !== null && CONFIG.TIMESHEET_API_URL !== null;
     }
     
     /**
