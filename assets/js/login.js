@@ -47,10 +47,10 @@ window.vibesheets = (function() {
                     localStorage.setItem('auth_api_url', CONFIG.AUTH_API_URL);
                     console.log('Development mode - using hardcoded auth API URL:', CONFIG.AUTH_API_URL);
                 } else {
-                    // Production mode - use api subdomain
-                    CONFIG.AUTH_API_URL = `https://api.${currentDomain}/config`;
+                    // Production mode - use actual API Gateway URL until api subdomain is configured
+                    CONFIG.AUTH_API_URL = 'https://tizdl2ywqi.execute-api.us-east-1.amazonaws.com/prod/config';
                     localStorage.setItem('auth_api_url', CONFIG.AUTH_API_URL);
-                    console.log('Production mode - auto-detected auth API URL:', CONFIG.AUTH_API_URL);
+                    console.log('Production mode - using API Gateway URL:', CONFIG.AUTH_API_URL);
                 }
             }
         }
@@ -71,10 +71,10 @@ window.vibesheets = (function() {
                     localStorage.setItem('timesheet_api_url', CONFIG.TIMESHEET_API_URL);
                     console.log('Development mode - using placeholder timesheet API URL:', CONFIG.TIMESHEET_API_URL);
                 } else {
-                    // Production mode - use api subdomain
-                    CONFIG.TIMESHEET_API_URL = `https://api.${currentDomain}`;
+                    // Production mode - use actual API Gateway URL until api subdomain is configured
+                    CONFIG.TIMESHEET_API_URL = 'https://tizdl2ywqi.execute-api.us-east-1.amazonaws.com/prod';
                     localStorage.setItem('timesheet_api_url', CONFIG.TIMESHEET_API_URL);
-                    console.log('Production mode - auto-detected timesheet API URL:', CONFIG.TIMESHEET_API_URL);
+                    console.log('Production mode - using API Gateway URL:', CONFIG.TIMESHEET_API_URL);
                 }
             }
         }
