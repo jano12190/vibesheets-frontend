@@ -1,4 +1,4 @@
-name: Deploy to S3
+name: Deploy Frontend to S3
 
 on:
   push:
@@ -20,7 +20,7 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
     
-    - name: Deploy to S3
+    - name: Deploy Frontend to S3
       run: |
         # Sync HTML files with proper content type
         aws s3 sync . s3://${{ secrets.S3_BUCKET_NAME }}/ \
@@ -29,6 +29,12 @@ jobs:
           --exclude ".github/*" \
           --exclude "*.css" \
           --exclude "*.js" \
+          --exclude "*.png" \
+          --exclude "*.jpg" \
+          --exclude "*.jpeg" \
+          --exclude "*.gif" \
+          --exclude "*.svg" \
+          --exclude "*.ico" \
           --exclude "README.md" \
           --exclude "*.md" \
           --content-type "text/html"
@@ -45,7 +51,34 @@ jobs:
           --include "*.js" \
           --content-type "application/javascript"
         
-        # Set cache control for static assets
+        # Sync image files with proper content types
+        aws s3 sync . s3://${{ secrets.S3_BUCKET_NAME }}/ \
+          --exclude "*" \
+          --include "*.png" \
+          --content-type "image/png"
+        
+        aws s3 sync . s3://${{ secrets.S3_BUCKET_NAME }}/ \
+          --exclude "*" \
+          --include "*.jpg" \
+          --include "*.jpeg" \
+          --content-type "image/jpeg"
+        
+        aws s3 sync . s3://${{ secrets.S3_BUCKET_NAME }}/ \
+          --exclude "*" \
+          --include "*.gif" \
+          --content-type "image/gif"
+        
+        aws s3 sync . s3://${{ secrets.S3_BUCKET_NAME }}/ \
+          --exclude "*" \
+          --include "*.svg" \
+          --content-type "image/svg+xml"
+        
+        aws s3 sync . s3://${{ secrets.S3_BUCKET_NAME }}/ \
+          --exclude "*" \
+          --include "*.ico" \
+          --content-type "image/x-icon"
+        
+        # Set cache control for static assets (1 year)
         aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}/ s3://${{ secrets.S3_BUCKET_NAME }}/ \
           --recursive \
           --exclude "*" \
@@ -60,10 +93,9 @@ jobs:
           --include "*.woff" \
           --include "*.woff2" \
           --metadata-directive REPLACE \
-          --cache-control "max-age=31536000" \
-          --expires "2025-12-31T23:59:59Z"
+          --cache-control "max-age=31536000"
         
-        # Set cache control for HTML files (shorter cache)
+        # Set cache control for HTML files (5 minutes)
         aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}/ s3://${{ secrets.S3_BUCKET_NAME }}/ \
           --recursive \
           --exclude "*" \
@@ -80,10 +112,13 @@ jobs:
     - name: Wait for invalidation to complete
       run: |
         echo "Waiting for CloudFront invalidation to complete..."
+        INVALIDATION_ID=$(aws cloudfront list-invalidations \
+          --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+          --query 'InvalidationList.Items[0].Id' \
+          --output text)
+        
         aws cloudfront wait invalidation-completed \
           --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
-          --id $(aws cloudfront list-invalidations \
-            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
-            --query 'InvalidationList.Items[0].Id' \
-            --output text)
+          --id $INVALIDATION_ID
+        
         echo "CloudFront invalidation completed!"
