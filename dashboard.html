@@ -8,10 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
-    <!-- Add Auth0 SDK for logout functionality -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/auth0-js/9.23.2/auth0.min.js"></script>
-    <!-- Add Google API for logout -->
-    <script src="https://apis.google.com/js/api:client.js"></script>
     <!-- Link to your CSS file -->
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
@@ -20,7 +17,10 @@
         <div class="logo">Vibesheets</div>
         <div class="user-info">
             <span id="userDisplay">Loading...</span>
-            <button class="logout-btn" onclick="logout()">↪ Logout</button>
+            <button class="logout-btn" onclick="logout()">
+                <img src="assets/exit.png" alt="Exit" style="width: 16px; height: 16px; margin-right: 6px; vertical-align: text-bottom; filter: brightness(0) invert(1);">
+                Logout
+            </button>
         </div>
     </div>
 
@@ -91,95 +91,5 @@
     </div>
 
     <div class="wave"></div>
-
-    <!-- Include authentication module first, then dashboard logic -->
-    <script src="assets/js/dashboard.js"></script>
-
-    <script>
-        // Authentication check and dashboard initialization
-        window.addEventListener('load', async () => {
-            try {
-                console.log('Dashboard page loaded, checking authentication...');
-                
-                // Check if user is authenticated using the vibesheets module
-                if (!window.vibesheets.isAuthenticated()) {
-                    console.log('User not authenticated, redirecting to login...');
-                    window.location.href = '/';
-                    return;
-                }
-                
-                // Get current user and display
-                const user = window.vibesheets.getCurrentUser();
-                const userDisplay = document.getElementById('userDisplay');
-                if (userDisplay && user) {
-                    userDisplay.textContent = user.name || user.nickname || user.email || 'User';
-                }
-                
-                console.log('User authenticated successfully:', user);
-                
-                // Initialize dashboard
-                if (typeof initializeDashboard === 'function') {
-                    await initializeDashboard();
-                } else {
-                    console.error('initializeDashboard function not found');
-                    showError('Dashboard initialization failed: Function not found');
-                }
-                
-            } catch (error) {
-                console.error('Dashboard initialization error:', error);
-                // If there's an auth error, redirect to login
-                if (error.message.includes('Authentication') || error.message.includes('token')) {
-                    console.log('Authentication error detected, redirecting to login...');
-                    window.location.href = '/';
-                } else {
-                    showError('Dashboard initialization failed: ' + error.message);
-                }
-            }
-        });
-        
-        // Logout function using the vibesheets module
-        function logout() {
-            if (confirm('Are you sure you want to logout?')) {
-                try {
-                    window.vibesheets.logout();
-                } catch (error) {
-                    console.error('Logout error:', error);
-                    // Fallback: clear storage and redirect manually
-                    localStorage.clear();
-                    window.location.href = '/';
-                }
-            }
-        }
-        
-        // Make logout available globally
-        window.logout = logout;
-        
-        // Error display function for dashboard initialization
-        function showError(message) {
-            const errorDiv = document.createElement('div');
-            errorDiv.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background-color: #e74c3c;
-                color: white;
-                padding: 12px 16px;
-                border-radius: 4px;
-                z-index: 1000;
-                max-width: 400px;
-                font-weight: 500;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-            `;
-            errorDiv.textContent = message;
-            document.body.appendChild(errorDiv);
-            
-            // Auto remove after 8 seconds
-            setTimeout(() => {
-                if (errorDiv.parentNode) {
-                    document.body.removeChild(errorDiv);
-                }
-            }, 8000);
-        }
-    </script>
 </body>
 </html>
