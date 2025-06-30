@@ -1,46 +1,51 @@
-/**
- * Dashboard Core Functionality for Vibesheets
- * Handles time tracking, data display, and user interactions
- * Requires: login.js to be loaded first
- */
+let clockStatus = 'out';
+let currentUser = null;
 
-// Global variables
-let clockedIn = false;
-let clockInTime = null;
-let currentTimeInterval = null;
+// Initialize dashboard when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    initializeDashboard();
+});
 
-/**
- * Initialize the dashboard
- */
 async function initializeDashboard() {
-    console.log('Initializing dashboard...');
+    // Check authentication
+    currentUser = getCurrentUser();
+    if (!currentUser && !isAuthenticated()) {
+        window.location.href = '/';
+        return;
+    }
     
-    try {
-        // Initialize authentication first - using vibesheets module
-        await window.vibesheets.initialize();
-        
-        // Start the clock
-        updateCurrentTime();
-        currentTimeInterval = setInterval(updateCurrentTime, 1000);
+    // Display user info
+    displayUserInfo();
+    
+    // Start clock
+    updateClock();
+    setInterval(updateClock, 1000);
+    
+    // Load initial data
+    await Promise.all([
+        loadClockStatus(),
+        loadMonthlyHours(),
+        loadTimeEntries()
+    ]);
+    
+    // Setup period select options
+    setupPeriodSelect();
+    
+    // Setup date filter
+    setupDateFilter();
+}
 
-        // Load dashboard data
-        await loadDashboardData();
-        
-        // Set up event listeners
-        setupEventListeners();
-        
-        console.log('Dashboard initialized successfully');
-        
-    } catch (error) {
-        console.error('Dashboard initialization failed:', error);
-        showError('Failed to initialize dashboard: ' + error.message);
+// Display user information
+function displayUserInfo() {
+    const userDisplay = document.getElementById('userDisplay');
+    if (currentUser && userDisplay) {
+        const displayName = currentUser.name || currentUser.email || 'User';
+        userDisplay.textContent = `Hello, ${displayName}`;
     }
 }
 
-/**
- * Update current time display
- */
-function updateCurrentTime() {
+// Update clock display
+function updateClock() {
     const now = new Date();
     const timeString = now.toLocaleTimeString('en-US', { 
         hour12: false,
@@ -54,593 +59,353 @@ function updateCurrentTime() {
         month: 'long',
         day: 'numeric'
     });
-
-    const timeElement = document.getElementById('currentTime');
-    const dateElement = document.getElementById('currentDate');
     
-    if (timeElement) timeElement.textContent = timeString;
-    if (dateElement) dateElement.textContent = dateString;
+    document.getElementById('currentTime').textContent = timeString;
+    document.getElementById('currentDate').textContent = dateString;
 }
 
-/**
- * Load dashboard data from API
- */
-async function loadDashboardData() {
+// Load current clock status
+async function loadClockStatus() {
     try {
-        // Check clock status
-        await checkClockStatus();
-        
-        // Load monthly hours
-        await loadMonthlyHours();
-        
-        // Load time entries
-        await loadTimeEntries();
-        
-        // Populate period select options
-        populatePeriodSelect();
-        
-    } catch (error) {
-        console.error('Failed to load dashboard data:', error);
-        showError('Failed to load data: ' + error.message);
-    }
-}
-
-/**
- * Check if user is currently clocked in
- */
-async function checkClockStatus() {
-    try {
-        const apiUrl = getTimesheetApiUrl();
-        const response = await window.vibesheets.apiCall(`${apiUrl}/clock-status`);
-        
+        const response = await apiCall('/status', 'GET');
         if (response.ok) {
             const data = await response.json();
-            clockedIn = data.clockedIn || false;
-            clockInTime = data.clockInTime ? new Date(data.clockInTime) : null;
-            
+            clockStatus = data.status || 'out';
             updateClockButtons();
         }
     } catch (error) {
-        console.error('Failed to check clock status:', error);
-        // Don't show error for this - just assume not clocked in
-        clockedIn = false;
-        updateClockButtons();
+        console.error('Failed to load clock status:', error);
     }
 }
 
-/**
- * Update clock in/out button visibility
- */
+// Update clock button visibility
 function updateClockButtons() {
     const clockInBtn = document.getElementById('clockInBtn');
     const clockOutBtn = document.getElementById('clockOutBtn');
     
-    if (clockInBtn && clockOutBtn) {
-        if (clockedIn) {
-            clockInBtn.style.display = 'none';
-            clockOutBtn.style.display = 'block';
-        } else {
-            clockInBtn.style.display = 'block';
-            clockOutBtn.style.display = 'none';
-        }
+    if (clockStatus === 'in') {
+        clockInBtn.style.display = 'none';
+        clockOutBtn.style.display = 'block';
+    } else {
+        clockInBtn.style.display = 'block';
+        clockOutBtn.style.display = 'none';
     }
 }
 
-/**
- * Clock in function
- */
+// Clock in function
 async function clockIn() {
     try {
-        const apiUrl = getTimesheetApiUrl();
-        const response = await window.vibesheets.apiCall(`${apiUrl}/clock-in`, {
-            method: 'POST',
-            body: JSON.stringify({
-                timestamp: new Date().toISOString()
-            })
+        const response = await apiCall('/clock', 'POST', {
+            action: 'in'
         });
-
+        
         if (response.ok) {
-            clockedIn = true;
-            clockInTime = new Date();
+            clockStatus = 'in';
             updateClockButtons();
-            showSuccess('Successfully clocked in!');
-            
-            // Refresh data
-            await loadDashboardData();
+            await Promise.all([
+                loadMonthlyHours(),
+                loadTimeEntries()
+            ]);
         } else {
-            const error = await response.text();
-            throw new Error(error);
+            const error = await response.json();
+            alert('Failed to clock in: ' + (error.message || 'Unknown error'));
         }
     } catch (error) {
-        console.error('Clock in failed:', error);
-        showError('Failed to clock in: ' + error.message);
+        console.error('Clock in error:', error);
+        alert('Failed to clock in. Please try again.');
     }
 }
 
-/**
- * Clock out function
- */
+// Clock out function
 async function clockOut() {
     try {
-        const apiUrl = getTimesheetApiUrl();
-        const response = await window.vibesheets.apiCall(`${apiUrl}/clock-out`, {
-            method: 'POST',
-            body: JSON.stringify({
-                timestamp: new Date().toISOString()
-            })
+        const response = await apiCall('/clock', 'POST', {
+            action: 'out'
         });
-
+        
         if (response.ok) {
-            clockedIn = false;
-            clockInTime = null;
+            clockStatus = 'out';
             updateClockButtons();
-            showSuccess('Successfully clocked out!');
-            
-            // Refresh data
-            await loadDashboardData();
+            await Promise.all([
+                loadMonthlyHours(),
+                loadTimeEntries()
+            ]);
         } else {
-            const error = await response.text();
-            throw new Error(error);
+            const error = await response.json();
+            alert('Failed to clock out: ' + (error.message || 'Unknown error'));
         }
     } catch (error) {
-        console.error('Clock out failed:', error);
-        showError('Failed to clock out: ' + error.message);
+        console.error('Clock out error:', error);
+        alert('Failed to clock out. Please try again.');
     }
 }
 
-/**
- * Load monthly hours
- */
+// Load monthly hours
 async function loadMonthlyHours() {
     try {
-        const currentDate = new Date();
-        const year = currentDate.getFullYear();
-        const month = currentDate.getMonth() + 1; // JavaScript months are 0-indexed
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
         
-        const apiUrl = getTimesheetApiUrl();
-        const response = await window.vibesheets.apiCall(
-            `${apiUrl}/hours?year=${year}&month=${month}`
-        );
-
+        const response = await apiCall(`/timesheets?start_date=${formatDate(startOfMonth)}&end_date=${formatDate(endOfMonth)}`, 'GET');
+        
         if (response.ok) {
             const data = await response.json();
-            const hours = data.totalHours || 0;
-            const monthlyHoursElement = document.getElementById('monthlyHours');
-            if (monthlyHoursElement) {
-                monthlyHoursElement.textContent = `${hours.toFixed(2)}h`;
+            // Use totalHours from API response if available, otherwise calculate
+            let totalHours = data.totalHours || 0;
+            if (!totalHours && data.timesheets) {
+                totalHours = data.timesheets.reduce((sum, day) => sum + (day.totalHours || 0), 0);
             }
+            document.getElementById('monthlyHours').textContent = totalHours.toFixed(2) + 'h';
         }
     } catch (error) {
         console.error('Failed to load monthly hours:', error);
-        const monthlyHoursElement = document.getElementById('monthlyHours');
-        if (monthlyHoursElement) {
-            monthlyHoursElement.textContent = '0.00h';
-        }
     }
 }
 
-/**
- * Load time entries
- */
+// Load time entries
 async function loadTimeEntries() {
     try {
-        const apiUrl = getTimesheetApiUrl();
-        const response = await window.vibesheets.apiCall(`${apiUrl}/entries`);
+        const response = await apiCall('/timesheets', 'GET');
         
         if (response.ok) {
-            const entries = await response.json();
+            const data = await response.json();
+            // Handle both possible response formats
+            const entries = data.entries || data.timesheets || [];
             displayTimeEntries(entries);
-        } else {
-            throw new Error('Failed to load time entries');
         }
     } catch (error) {
         console.error('Failed to load time entries:', error);
-        const container = document.getElementById('timeEntriesContainer');
-        if (container) {
-            container.innerHTML = '<div class="error-message">Failed to load time entries</div>';
-        }
+        document.getElementById('timeEntriesContainer').innerHTML = '<div class="error">Failed to load time entries</div>';
     }
 }
 
-/**
- * Display time entries
- */
-function displayTimeEntries(entries) {
+// Display time entries
+function displayTimeEntries(data) {
     const container = document.getElementById('timeEntriesContainer');
-    if (!container) return;
     
-    if (!entries || entries.length === 0) {
+    // Handle both formats: direct entries array or timesheets grouped by date
+    let entries = [];
+    if (Array.isArray(data)) {
+        if (data.length > 0 && data[0].entries) {
+            // Grouped format: flatten all entries from all dates
+            entries = data.flatMap(day => day.entries || []);
+        } else {
+            // Direct entries format
+            entries = data;
+        }
+    }
+    
+    if (!entries.length) {
         container.innerHTML = '<div class="no-entries">No time entries found</div>';
         return;
     }
-
-    const entriesHtml = entries.map(entry => {
-        const startTime = new Date(entry.startTime).toLocaleString();
-        const endTime = entry.endTime ? new Date(entry.endTime).toLocaleString() : 'In Progress';
-        const duration = entry.duration ? `${entry.duration.toFixed(2)}h` : 'N/A';
-        
-        return `
-            <div class="time-entry" data-id="${entry.id}">
-                <div class="entry-details">
-                    <div class="entry-date">${new Date(entry.startTime).toLocaleDateString()}</div>
-                    <div class="entry-times">
-                        <span class="start-time">Start: ${startTime}</span>
-                        <span class="end-time">End: ${endTime}</span>
-                        <span class="duration">Duration: ${duration}</span>
-                    </div>
-                </div>
-                <div class="entry-actions">
-                    <button class="edit-btn" onclick="editEntry('${entry.id}')">Edit</button>
-                    <button class="delete-btn" onclick="deleteEntry('${entry.id}')">Delete</button>
-                </div>
+    
+    const entriesHtml = entries.map(entry => `
+        <div class="time-entry" data-id="${entry.timestamp}">
+            <div class="entry-date">${formatDateTime(entry.timestamp)}</div>
+            <div class="entry-type">${entry.type}</div>
+            <div class="entry-hours">
+                <input type="number" value="${entry.hours || 0}" step="0.25" min="0" max="24" 
+                       onchange="updateTimeEntry('${entry.timestamp}', this.value)">
+                <span>hours</span>
             </div>
-        `;
-    }).join('');
-
+        </div>
+    `).join('');
+    
     container.innerHTML = entriesHtml;
 }
 
-/**
- * Setup event listeners
- */
-function setupEventListeners() {
-    // Date filter change
-    const dateFilter = document.getElementById('dateFilter');
-    if (dateFilter) {
-        dateFilter.addEventListener('change', handleDateFilterChange);
-    }
-
-    // Period select change
-    const periodSelect = document.getElementById('periodSelect');
-    if (periodSelect) {
-        periodSelect.addEventListener('change', handlePeriodChange);
-    }
-}
-
-/**
- * Handle date filter change
- */
-function handleDateFilterChange() {
-    const dateFilter = document.getElementById('dateFilter');
-    const specificDateInput = document.getElementById('specificDateInput');
-    
-    if (!dateFilter) return;
-    
-    if (specificDateInput) {
-        if (dateFilter.value === 'specific-date') {
-            specificDateInput.style.display = 'block';
-        } else {
-            specificDateInput.style.display = 'none';
-            filterTimeEntries(dateFilter.value);
-        }
-    }
-}
-
-/**
- * Handle period selection change
- */
-function handlePeriodChange() {
-    const periodSelect = document.getElementById('periodSelect');
-    const dateRangeInputs = document.getElementById('dateRangeInputs');
-    
-    if (periodSelect && dateRangeInputs) {
-        if (periodSelect.value === 'custom') {
-            dateRangeInputs.style.display = 'block';
-        } else {
-            dateRangeInputs.style.display = 'none';
-        }
-    }
-}
-
-/**
- * Filter time entries by date
- */
-async function filterTimeEntries(filter) {
+// Update time entry
+async function updateTimeEntry(timestamp, hours) {
     try {
-        const apiUrl = getTimesheetApiUrl();
-        let url = `${apiUrl}/entries`;
-        
-        // Add date filters based on selection
-        const now = new Date();
-        let startDate, endDate;
-        
-        switch (filter) {
-            case 'today':
-                startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-                break;
-            case 'yesterday':
-                startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-                endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                break;
-            case 'this-week':
-                const firstDay = now.getDate() - now.getDay();
-                startDate = new Date(now.getFullYear(), now.getMonth(), firstDay);
-                endDate = new Date(now.getFullYear(), now.getMonth(), firstDay + 7);
-                break;
-            case 'this-month':
-                startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-                endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-                break;
-            default:
-                // All dates - no filter
-                break;
-        }
-        
-        if (startDate && endDate) {
-            url += `?start=${startDate.toISOString()}&end=${endDate.toISOString()}`;
-        }
-        
-        const response = await window.vibesheets.apiCall(url);
+        const response = await apiCall('/timesheets', 'PUT', {
+            timestamp: timestamp,
+            updates: {
+                hours: parseFloat(hours)
+            }
+        });
         
         if (response.ok) {
-            const entries = await response.json();
-            displayTimeEntries(entries);
+            await loadMonthlyHours(); // Refresh monthly total
+        } else {
+            const error = await response.json();
+            alert('Failed to update entry: ' + (error.message || 'Unknown error'));
+            await loadTimeEntries(); // Reload to reset the input
         }
     } catch (error) {
-        console.error('Failed to filter time entries:', error);
-        showError('Failed to filter entries: ' + error.message);
+        console.error('Update error:', error);
+        alert('Failed to update entry. Please try again.');
+        await loadTimeEntries(); // Reload to reset the input
     }
 }
 
-/**
- * Filter by specific date
- */
-function filterBySpecificDate() {
-    const specificDate = document.getElementById('specificDate');
-    if (specificDate && specificDate.value) {
-        const date = new Date(specificDate.value);
-        const startDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-        const endDate = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
-        
-        filterTimeEntriesByDateRange(startDate, endDate);
-    }
-}
-
-/**
- * Filter time entries by date range
- */
-async function filterTimeEntriesByDateRange(startDate, endDate) {
-    try {
-        const apiUrl = getTimesheetApiUrl();
-        const url = `${apiUrl}/entries?start=${startDate.toISOString()}&end=${endDate.toISOString()}`;
-        const response = await window.vibesheets.apiCall(url);
-        
-        if (response.ok) {
-            const entries = await response.json();
-            displayTimeEntries(entries);
-        }
-    } catch (error) {
-        console.error('Failed to filter time entries by date range:', error);
-        showError('Failed to filter entries: ' + error.message);
-    }
-}
-
-/**
- * Populate period select options
- */
-function populatePeriodSelect() {
-    const periodSelect = document.getElementById('periodSelect');
-    if (!periodSelect) return;
+// Setup period select options
+function setupPeriodSelect() {
+    const select = document.getElementById('periodSelect');
+    const optgroup = select.querySelector('optgroup[label="Available Months"]');
     
-    const optgroup = periodSelect.querySelector('optgroup[label="2025 Months"]');
-    if (!optgroup) return;
+    // Clear existing options to prevent duplicates
+    optgroup.innerHTML = '';
     
-    const currentYear = new Date().getFullYear();
     const months = [
         'January', 'February', 'March', 'April', 'May', 'June',
         'July', 'August', 'September', 'October', 'November', 'December'
     ];
     
-    // Clear existing options
-    optgroup.innerHTML = '';
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth(); // 0-based
     
-    // Add current year months
-    months.forEach((month, index) => {
+    // Only show months from current month onwards for current year
+    for (let month = currentMonth; month < 12; month++) {
         const option = document.createElement('option');
-        option.value = `${currentYear}-${index + 1}`;
-        option.textContent = `${month} ${currentYear}`;
+        option.value = `${currentYear}-${String(month + 1).padStart(2, '0')}`;
+        option.textContent = `${months[month]} ${currentYear}`;
         optgroup.appendChild(option);
-    });
-}
-
-/**
- * Export timesheet data
- */
-async function exportPDF() {
-    try {
-        const periodSelect = document.getElementById('periodSelect');
-        const startDateInput = document.getElementById('startDate');
-        const endDateInput = document.getElementById('endDate');
-        
-        const apiUrl = getTimesheetApiUrl();
-        let url = `${apiUrl}/export`;
-        let params = new URLSearchParams();
-        
-        if (periodSelect && periodSelect.value === 'custom') {
-            if (startDateInput && endDateInput && startDateInput.value && endDateInput.value) {
-                params.append('start', startDateInput.value);
-                params.append('end', endDateInput.value);
-            } else {
-                showError('Please select both start and end dates for custom range');
-                return;
-            }
-        } else if (periodSelect && periodSelect.value) {
-            const [year, month] = periodSelect.value.split('-');
-            params.append('year', year);
-            params.append('month', month);
-        } else {
-            showError('Please select a time period to export');
-            return;
+    }
+    
+    // Add next year's months if we're near year end
+    if (currentMonth >= 10) { // November or December
+        const nextYear = currentYear + 1;
+        for (let month = 0; month < 12; month++) {
+            const option = document.createElement('option');
+            option.value = `${nextYear}-${String(month + 1).padStart(2, '0')}`;
+            option.textContent = `${months[month]} ${nextYear}`;
+            optgroup.appendChild(option);
         }
-        
-        if (params.toString()) {
-            url += '?' + params.toString();
-        }
-        
-        const response = await window.vibesheets.apiCall(url);
-        
-        if (response.ok) {
-            const blob = await response.blob();
-            const downloadUrl = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = downloadUrl;
-            a.download = `timesheet-${new Date().toISOString().split('T')[0]}.csv`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(downloadUrl);
-            
-            showSuccess('Timesheet exported successfully!');
-        } else {
-            throw new Error('Export failed');
-        }
-    } catch (error) {
-        console.error('Export failed:', error);
-        showError('Failed to export timesheet: ' + error.message);
     }
 }
 
-/**
- * Edit time entry
- */
-function editEntry(entryId) {
-    // This would open a modal or form to edit the entry
-    console.log('Edit entry:', entryId);
-    showInfo('Edit functionality coming soon!');
+// Handle period change
+function handlePeriodChange() {
+    const select = document.getElementById('periodSelect');
+    const dateRangeInputs = document.getElementById('dateRangeInputs');
+    
+    if (select.value === 'custom') {
+        dateRangeInputs.style.display = 'flex';
+    } else {
+        dateRangeInputs.style.display = 'none';
+    }
 }
 
-/**
- * Delete time entry
- */
-async function deleteEntry(entryId) {
-    if (!confirm('Are you sure you want to delete this time entry?')) {
+// Export PDF/CSV
+async function exportPDF() {
+    const periodSelect = document.getElementById('periodSelect');
+    const startDateInput = document.getElementById('startDate');
+    const endDateInput = document.getElementById('endDate');
+    
+    let startDate, endDate;
+    
+    if (periodSelect.value === 'custom') {
+        if (!startDateInput.value || !endDateInput.value) {
+            alert('Please select both start and end dates for custom range.');
+            return;
+        }
+        startDate = startDateInput.value;
+        endDate = endDateInput.value;
+    } else if (periodSelect.value) {
+        // Monthly export
+        const [year, month] = periodSelect.value.split('-');
+        startDate = `${year}-${month}-01`;
+        const lastDay = new Date(year, month, 0).getDate();
+        endDate = `${year}-${month}-${String(lastDay).padStart(2, '0')}`;
+    } else {
+        alert('Please select a time period to export.');
         return;
     }
     
     try {
-        const apiUrl = getTimesheetApiUrl();
-        const response = await window.vibesheets.apiCall(`${apiUrl}/entries/${entryId}`, {
-            method: 'DELETE'
+        const response = await apiCall('/export', 'POST', {
+            start_date: startDate,
+            end_date: endDate
         });
         
         if (response.ok) {
-            showSuccess('Time entry deleted successfully!');
-            await loadTimeEntries(); // Refresh the list
-            await loadMonthlyHours(); // Update monthly total
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `timesheet_${startDate}_to_${endDate}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
         } else {
-            throw new Error('Delete failed');
+            const error = await response.json();
+            alert('Export failed: ' + (error.message || 'Unknown error'));
         }
     } catch (error) {
-        console.error('Delete failed:', error);
-        showError('Failed to delete time entry: ' + error.message);
+        console.error('Export error:', error);
+        alert('Export failed. Please try again.');
     }
 }
 
-/**
- * Get timesheet API URL from config
- */
-function getTimesheetApiUrl() {
-    // First try to get from localStorage (set during login)
-    const storedUrl = localStorage.getItem('timesheet_api_url');
-    if (storedUrl) {
-        return storedUrl;
-    }
+// Setup date filter
+function setupDateFilter() {
+    const dateFilter = document.getElementById('dateFilter');
+    const specificDateInput = document.getElementById('specificDateInput');
     
-    // Fallback to the config from vibesheets module
-    return window.vibesheets.CONFIG.TIMESHEET_API_URL;
-}
-
-/**
- * Utility functions for showing messages
- */
-function showError(message) {
-    showMessage(message, 'error');
-}
-
-function showSuccess(message) {
-    showMessage(message, 'success');
-}
-
-function showInfo(message) {
-    showMessage(message, 'info');
-}
-
-function showMessage(message, type) {
-    // Create or get message container
-    let messageContainer = document.getElementById('messageContainer');
-    if (!messageContainer) {
-        messageContainer = document.createElement('div');
-        messageContainer.id = 'messageContainer';
-        messageContainer.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 1000;
-            max-width: 400px;
-        `;
-        document.body.appendChild(messageContainer);
-    }
-    
-    // Create message element
-    const messageElement = document.createElement('div');
-    messageElement.className = `message message-${type}`;
-    messageElement.style.cssText = `
-        padding: 12px 16px;
-        margin-bottom: 10px;
-        border-radius: 4px;
-        color: white;
-        font-weight: 500;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-        animation: slideIn 0.3s ease;
-        background-color: ${type === 'error' ? '#e74c3c' : type === 'success' ? '#27ae60' : '#3498db'};
-    `;
-    messageElement.textContent = message;
-    
-    // Add to container
-    messageContainer.appendChild(messageElement);
-    
-    // Auto remove after 5 seconds
-    setTimeout(() => {
-        if (messageElement.parentNode) {
-            messageElement.style.animation = 'slideOut 0.3s ease';
-            setTimeout(() => {
-                if (messageElement.parentNode) {
-                    messageContainer.removeChild(messageElement);
-                }
-            }, 300);
+    dateFilter.addEventListener('change', function() {
+        if (this.value === 'specific-date') {
+            specificDateInput.style.display = 'flex';
+        } else {
+            specificDateInput.style.display = 'none';
+            filterTimeEntries(this.value);
         }
-    }, 5000);
+    });
 }
 
-// Initialize CSS animations if not already present
-function initializeStyles() {
-    if (!document.getElementById('messageStyles')) {
-        const style = document.createElement('style');
-        style.id = 'messageStyles';
-        style.textContent = `
-            @keyframes slideIn {
-                from { transform: translateX(100%); opacity: 0; }
-                to { transform: translateX(0); opacity: 1; }
-            }
-            @keyframes slideOut {
-                from { transform: translateX(0); opacity: 1; }
-                to { transform: translateX(100%); opacity: 0; }
-            }
-        `;
-        document.head.appendChild(style);
+// Filter time entries by date
+function filterTimeEntries(filter) {
+    // This would filter the displayed entries based on the selected filter
+    // For now, just reload all entries
+    loadTimeEntries();
+}
+
+// Filter by specific date
+function filterBySpecificDate() {
+    const date = document.getElementById('specificDate').value;
+    if (date) {
+        // Filter entries for specific date
+        loadTimeEntries(); // In a real implementation, this would filter by date
     }
 }
 
-// Initialize styles when script loads
-initializeStyles();
+// API call helper function
+async function apiCall(endpoint, method, body) {
+    const token = getAccessToken();
+    if (!token) {
+        throw new Error('No access token available');
+    }
+    
+    const options = {
+        method: method,
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        }
+    };
+    
+    if (body) {
+        options.body = JSON.stringify(body);
+    }
+    
+    return fetch(`https://api.vibesheets.com${endpoint}`, options);
+}
 
-// Make functions available globally
-window.initializeDashboard = initializeDashboard;
-window.clockIn = clockIn;
-window.clockOut = clockOut;
-window.exportPDF = exportPDF;
-window.handlePeriodChange = handlePeriodChange;
-window.filterBySpecificDate = filterBySpecificDate;
-window.editEntry = editEntry;
-window.deleteEntry = deleteEntry;
+// Utility functions
+function formatDate(date) {
+    return date.toISOString().split('T')[0];
+}
+
+function formatDateTime(timestamp) {
+    const date = new Date(timestamp);
+    return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}

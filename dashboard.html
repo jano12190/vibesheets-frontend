@@ -10,7 +10,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/auth0-js/9.23.2/auth0.min.js"></script>
     <!-- Link to your CSS file -->
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/dashboard.css">
+    <!-- Link to JavaScript files -->
+    <script src="assets/js/auth.js"></script>
+    <script src="assets/js/dashboard.js"></script>
 </head>
 <body>
     <div class="header">
@@ -30,8 +33,10 @@
             <div class="time-display" id="currentTime">--:--:--</div>
             <div class="date-display" id="currentDate">Loading...</div>
             <!-- Both buttons with proper visibility logic -->
-            <button class="clock-in-btn" onclick="clockIn()" id="clockInBtn">Clock In</button>
-            <button class="clock-out-btn" onclick="clockOut()" id="clockOutBtn" style="display: none;">Clock Out</button>
+            <div class="clock-button-container">
+                <button class="clock-in-btn" onclick="clockIn()" id="clockInBtn">Clock In</button>
+                <button class="clock-out-btn" onclick="clockOut()" id="clockOutBtn" style="display: none;">Clock Out</button>
+            </div>
         </div>
 
         <div class="card this-month-card">
@@ -47,7 +52,7 @@
             <label for="periodSelect">Period:</label>
             <select class="period-select" id="periodSelect" onchange="handlePeriodChange()">
                 <option value="">Select time period</option>
-                <optgroup label="2025 Months">
+                <optgroup label="Available Months">
                     <!-- Options will be generated dynamically by JavaScript -->
                 </optgroup>
                 <optgroup label="Custom">
