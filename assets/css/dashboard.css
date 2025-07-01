@@ -170,6 +170,24 @@
             background: rgba(255, 255, 255, 0.3);
             transform: scale(1.1);
         }
+        
+        /* Better touch targets for all interactive elements */
+        @media (pointer: coarse) {
+            .login-btn, .clock-in-btn, .clock-out-btn, .export-btn, .edit-btn {
+                min-height: 44px;
+                padding: 12px 20px;
+            }
+            
+            .period-select, .date-input, .date-filter {
+                min-height: 44px;
+                padding: 12px 16px;
+            }
+            
+            .logout-btn {
+                min-height: 44px;
+                padding: 12px 20px;
+            }
+        }
 
         .this-month-card {
             text-align: center;
@@ -512,11 +530,21 @@
 
         @media (max-width: 768px) {
             body {
-                padding: 20px 30px;
+                padding: 15px;
             }
             
             .header {
-                margin-bottom: 30px;
+                flex-direction: column;
+                gap: 15px;
+                margin-bottom: 25px;
+                text-align: center;
+            }
+            
+            .user-info {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                align-items: center;
             }
             
             .logo {
@@ -526,8 +554,10 @@
             }
             
             .logout-btn {
-                padding: 10px 16px;
+                padding: 12px 20px;
                 border-radius: 8px;
+                min-height: 44px;
+                font-size: 16px;
             }
             
             .dashboard-grid {
@@ -537,8 +567,23 @@
             }
             
             .card {
-                padding: 24px;
+                padding: 20px;
                 border-radius: 15px;
+            }
+            
+            .time-display {
+                font-size: 36px;
+            }
+            
+            .hours-display {
+                font-size: 28px;
+            }
+            
+            .clock-in-btn, .clock-out-btn {
+                padding: 16px 32px;
+                font-size: 18px;
+                min-height: 52px;
+                border-radius: 10px;
             }
             
             .export-card {
@@ -558,16 +603,20 @@
                 margin-top: 10px;
             }
             
-            .period-select {
+            .period-select, .date-input {
                 min-width: auto;
-                padding: 12px 15px;
+                padding: 14px 16px;
                 border-radius: 8px;
+                font-size: 16px;
+                min-height: 48px;
             }
             
             .export-btn {
-                padding: 12px 20px;
+                padding: 14px 20px;
                 border-radius: 8px;
                 justify-content: center;
+                min-height: 48px;
+                font-size: 16px;
             }
             
             .time-entries-card {
@@ -575,28 +624,118 @@
             }
             
             .time-entries-header {
+                flex-direction: column;
+                gap: 15px;
                 margin-bottom: 20px;
+                align-items: stretch;
             }
             
             .date-filter {
-                padding: 10px 12px;
+                padding: 14px 16px;
                 border-radius: 8px;
+                font-size: 16px;
+                min-height: 48px;
             }
             
             .time-entry {
                 flex-direction: column;
                 align-items: flex-start;
                 gap: 15px;
-                padding: 20px;
-                border-radius: 10px;
-                margin-bottom: 12px;
+                padding: 18px;
+                border-radius: 12px;
+                margin-bottom: 15px;
             }
             
             .entry-info {
+                width: 100%;
                 gap: 15px;
+            }
+            
+            .entry-details {
+                flex: 1;
+            }
+            
+            .entry-duration {
+                font-size: 18px;
+                margin-top: 5px;
+            }
+            
+            .edit-btn {
+                padding: 10px 16px;
+                border-radius: 8px;
+                min-height: 44px;
+                align-self: flex-end;
             }
         }
 
+        /* Small mobile devices */
+        @media (max-width: 480px) {
+            body {
+                padding: 10px;
+            }
+            
+            .header {
+                margin-bottom: 20px;
+            }
+            
+            .logo {
+                padding: 10px 16px;
+                font-size: 16px;
+            }
+            
+            .card {
+                padding: 16px;
+                border-radius: 12px;
+            }
+            
+            .time-display {
+                font-size: 28px;
+            }
+            
+            .hours-display {
+                font-size: 24px;
+            }
+            
+            .clock-in-btn, .clock-out-btn {
+                padding: 14px 28px;
+                font-size: 16px;
+            }
+            
+            .time-entry {
+                padding: 16px;
+            }
+            
+            .entry-date {
+                font-size: 15px;
+            }
+            
+            .entry-times {
+                font-size: 13px;
+            }
+            
+            .entry-duration {
+                font-size: 16px;
+            }
+        }
+        
+        /* Landscape phone orientation */
+        @media (max-width: 768px) and (orientation: landscape) {
+            .header {
+                flex-direction: row;
+                justify-content: space-between;
+            }
+            
+            .user-info {
+                flex-direction: row;
+                gap: 15px;
+            }
+            
+            .dashboard-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 15px;
+            }
+        }
+        
         @media (max-width: 1024px) and (min-width: 769px) {
             body {
                 padding: 30px 45px;
@@ -717,4 +856,22 @@
         .edit-hours-btn:hover {
             background: rgba(255, 255, 255, 0.3);
             transform: scale(1.1);
+        }
+        
+        /* Better touch targets for all interactive elements */
+        @media (pointer: coarse) {
+            .login-btn, .clock-in-btn, .clock-out-btn, .export-btn, .edit-btn {
+                min-height: 44px;
+                padding: 12px 20px;
+            }
+            
+            .period-select, .date-input, .date-filter {
+                min-height: 44px;
+                padding: 12px 16px;
+            }
+            
+            .logout-btn {
+                min-height: 44px;
+                padding: 12px 20px;
+            }
         }
