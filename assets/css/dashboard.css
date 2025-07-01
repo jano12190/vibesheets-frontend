@@ -117,8 +117,6 @@
             cursor: pointer;
             transition: all 0.3s ease;
             box-shadow: 0 4px 16px rgba(231, 76, 60, 0.3);
-            margin: 0 auto;
-            display: inline-block;
         }
 
         .clock-out-btn:hover {
@@ -585,7 +583,9 @@
 
         .clock-button-container {
             width: 100%;
-            text-align: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
             margin-top: 20px;
         }
 
@@ -600,8 +600,6 @@
             cursor: pointer;
             transition: all 0.3s ease;
             box-shadow: 0 4px 16px rgba(67, 206, 162, 0.3);
-            margin: 0 auto;
-            display: inline-block;
         }
 
         .clock-in-btn:hover {
@@ -621,8 +619,6 @@
             cursor: pointer;
             transition: all 0.3s ease;
             box-shadow: 0 4px 16px rgba(231, 76, 60, 0.3);
-            margin: 0 auto;
-            display: inline-block;
         }
 
         .clock-out-btn:hover {
