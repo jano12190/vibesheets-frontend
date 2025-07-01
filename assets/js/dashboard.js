@@ -411,18 +411,78 @@ function setupDateFilter() {
 }
 
 // Filter time entries by date
-function filterTimeEntries(filter) {
-    // This would filter the displayed entries based on the selected filter
-    // For now, just reload all entries
-    loadTimeEntries();
+async function filterTimeEntries(filter) {
+    try {
+        let endpoint = '/timesheets';
+        const now = new Date();
+        
+        switch (filter) {
+            case 'today':
+                const today = formatDate(now);
+                endpoint = `/timesheets?start_date=${today}&end_date=${today}`;
+                break;
+            case 'yesterday':
+                const yesterday = new Date(now);
+                yesterday.setDate(yesterday.getDate() - 1);
+                const yesterdayStr = formatDate(yesterday);
+                endpoint = `/timesheets?start_date=${yesterdayStr}&end_date=${yesterdayStr}`;
+                break;
+            case 'this-week':
+                const startOfWeek = new Date(now);
+                startOfWeek.setDate(now.getDate() - now.getDay());
+                const endOfWeek = new Date(startOfWeek);
+                endOfWeek.setDate(startOfWeek.getDate() + 6);
+                endpoint = `/timesheets?start_date=${formatDate(startOfWeek)}&end_date=${formatDate(endOfWeek)}`;
+                break;
+            case 'this-month':
+                const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                endpoint = `/timesheets?start_date=${formatDate(startOfMonth)}&end_date=${formatDate(endOfMonth)}`;
+                break;
+            case 'all':
+            default:
+                endpoint = '/timesheets';
+                break;
+        }
+        
+        const response = await apiCall(endpoint, 'GET');
+        
+        if (response.ok) {
+            const data = await response.json();
+            const entries = data.entries || data.timesheets || [];
+            displayTimeEntries(entries);
+        } else {
+            console.error('Failed to filter time entries');
+            document.getElementById('timeEntriesContainer').innerHTML = '<div class="error">Failed to load filtered entries</div>';
+        }
+    } catch (error) {
+        console.error('Error filtering time entries:', error);
+        document.getElementById('timeEntriesContainer').innerHTML = '<div class="error">Error filtering entries</div>';
+    }
 }
 
 // Filter by specific date
-function filterBySpecificDate() {
+async function filterBySpecificDate() {
     const date = document.getElementById('specificDate').value;
     if (date) {
-        // Filter entries for specific date
-        loadTimeEntries(); // In a real implementation, this would filter by date
+        try {
+            const response = await apiCall(`/timesheets?start_date=${date}&end_date=${date}`, 'GET');
+            
+            if (response.ok) {
+                const data = await response.json();
+                const entries = data.entries || data.timesheets || [];
+                displayTimeEntries(entries);
+            } else {
+                console.error('Failed to filter by specific date');
+                document.getElementById('timeEntriesContainer').innerHTML = '<div class="error">Failed to load entries for selected date</div>';
+            }
+        } catch (error) {
+            console.error('Error filtering by specific date:', error);
+            document.getElementById('timeEntriesContainer').innerHTML = '<div class="error">Error loading entries for selected date</div>';
+        }
+    } else {
+        // If no date selected, show all entries
+        loadTimeEntries();
     }
 }
 
