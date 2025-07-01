@@ -151,15 +151,34 @@ async function loadMonthlyHours() {
         
         if (response.ok) {
             const data = await response.json();
-            // Use totalHours from API response if available, otherwise calculate
-            let totalHours = data.totalHours || 0;
-            if (!totalHours && data.timesheets) {
-                totalHours = data.timesheets.reduce((sum, day) => sum + (day.totalHours || 0), 0);
+            let totalHours = 0;
+            
+            // Calculate total hours from entries
+            const entries = data.entries || data.timesheets || [];
+            if (Array.isArray(entries)) {
+                if (entries.length > 0 && entries[0].entries) {
+                    // Grouped format: sum hours from all days
+                    totalHours = entries.reduce((sum, day) => {
+                        const dayTotal = day.totalHours || 
+                            (day.entries ? day.entries.reduce((daySum, entry) => daySum + (entry.hours || 0), 0) : 0);
+                        return sum + dayTotal;
+                    }, 0);
+                } else {
+                    // Direct entries format: sum all hours
+                    totalHours = entries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
+                }
             }
+            
+            // Also try using totalHours from API if calculation is 0
+            if (totalHours === 0 && data.totalHours) {
+                totalHours = data.totalHours;
+            }
+            
             document.getElementById('monthlyHours').textContent = totalHours.toFixed(2) + 'h';
         }
     } catch (error) {
         console.error('Failed to load monthly hours:', error);
+        document.getElementById('monthlyHours').textContent = '0.00h';
     }
 }
 
@@ -180,7 +199,7 @@ async function loadTimeEntries() {
     }
 }
 
-// Display time entries
+// Display time entries  
 function displayTimeEntries(data) {
     const container = document.getElementById('timeEntriesContainer');
     
@@ -201,44 +220,79 @@ function displayTimeEntries(data) {
         return;
     }
     
-    const entriesHtml = entries.map(entry => `
-        <div class="time-entry" data-id="${entry.timestamp}">
-            <div class="entry-date">${formatDateTime(entry.timestamp)}</div>
-            <div class="entry-type">${entry.type}</div>
-            <div class="entry-hours">
-                <input type="number" value="${entry.hours || 0}" step="0.25" min="0" max="24" 
-                       onchange="updateTimeEntry('${entry.timestamp}', this.value)">
-                <span>hours</span>
-            </div>
-        </div>
-    `).join('');
+    // Group entries by date and pair clock-in/out entries
+    const entriesByDate = {};
+    entries.forEach(entry => {
+        const date = entry.date || entry.timestamp.split('T')[0];
+        if (!entriesByDate[date]) {
+            entriesByDate[date] = [];
+        }
+        entriesByDate[date].push(entry);
+    });
+    
+    let entriesHtml = '';
+    
+    // Sort dates in descending order (most recent first)
+    const sortedDates = Object.keys(entriesByDate).sort((a, b) => b.localeCompare(a));
+    
+    sortedDates.forEach(date => {
+        const dayEntries = entriesByDate[date].sort((a, b) => 
+            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        );
+        
+        // Group clock-in and clock-out pairs
+        const pairs = [];
+        let currentPair = null;
+        
+        dayEntries.forEach(entry => {
+            if (entry.type === 'in') {
+                if (currentPair) {
+                    // Previous pair was incomplete, add it anyway
+                    pairs.push(currentPair);
+                }
+                currentPair = { clockIn: entry, clockOut: null };
+            } else if (entry.type === 'out') {
+                if (currentPair) {
+                    currentPair.clockOut = entry;
+                    pairs.push(currentPair);
+                    currentPair = null;
+                } else {
+                    // Clock out without clock in, show as standalone
+                    pairs.push({ clockIn: null, clockOut: entry });
+                }
+            }
+        });
+        
+        // Add incomplete pair if exists
+        if (currentPair) {
+            pairs.push(currentPair);
+        }
+        
+        // Generate HTML for each pair
+        pairs.forEach(pair => {
+            const clockInTime = pair.clockIn ? formatTimeOnly(pair.clockIn.timestamp) : '--:--';
+            const clockOutTime = pair.clockOut ? formatTimeOnly(pair.clockOut.timestamp) : '--:--';
+            const duration = calculateDuration(pair.clockIn, pair.clockOut);
+            const displayDate = formatDateOnly(date);
+            
+            entriesHtml += `
+                <div class="time-entry">
+                    <div class="entry-info">
+                        <div class="entry-status"></div>
+                        <div class="entry-details">
+                            <div class="entry-date">${displayDate}</div>
+                            <div class="entry-times">In: ${clockInTime} | Out: ${clockOutTime}</div>
+                        </div>
+                    </div>
+                    <div class="entry-duration">${duration}</div>
+                </div>
+            `;
+        });
+    });
     
     container.innerHTML = entriesHtml;
 }
 
-// Update time entry
-async function updateTimeEntry(timestamp, hours) {
-    try {
-        const response = await apiCall('/timesheets', 'PUT', {
-            timestamp: timestamp,
-            updates: {
-                hours: parseFloat(hours)
-            }
-        });
-        
-        if (response.ok) {
-            await loadMonthlyHours(); // Refresh monthly total
-        } else {
-            const error = await response.json();
-            alert('Failed to update entry: ' + (error.message || 'Unknown error'));
-            await loadTimeEntries(); // Reload to reset the input
-        }
-    } catch (error) {
-        console.error('Update error:', error);
-        alert('Failed to update entry. Please try again.');
-        await loadTimeEntries(); // Reload to reset the input
-    }
-}
 
 // Setup period select options
 function setupPeriodSelect() {
@@ -408,4 +462,35 @@ function formatDateTime(timestamp) {
         hour: '2-digit',
         minute: '2-digit'
     });
+}
+
+function formatTimeOnly(timestamp) {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    });
+}
+
+function formatDateOnly(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric'
+    });
+}
+
+function calculateDuration(clockIn, clockOut) {
+    if (!clockIn || !clockOut) {
+        return clockIn && !clockOut ? 'In Progress' : '--:--';
+    }
+    
+    const start = new Date(clockIn.timestamp);
+    const end = new Date(clockOut.timestamp);
+    const diffMs = end.getTime() - start.getTime();
+    const diffHours = diffMs / (1000 * 60 * 60);
+    
+    return diffHours.toFixed(2) + 'h';
 }
