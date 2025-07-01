@@ -131,10 +131,14 @@ function handleAuthCallback() {
         if (authResult && authResult.accessToken && authResult.idToken) {
             console.log('Successfully parsed tokens');
             
-            // Store tokens
+            // Store tokens with extended expiration for persistent login
             localStorage.setItem('access_token', authResult.accessToken);
             localStorage.setItem('id_token', authResult.idToken);
-            localStorage.setItem('expires_at', JSON.stringify((authResult.expiresIn * 1000) + new Date().getTime()));
+            
+            // Set expiration to 30 days instead of default short period
+            const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000;
+            const expiresAt = new Date().getTime() + thirtyDaysInMs;
+            localStorage.setItem('expires_at', JSON.stringify(expiresAt));
             
             // Get user info
             auth0Client.client.userInfo(authResult.accessToken, (err, user) => {
@@ -175,10 +179,28 @@ function handleAuthCallback() {
     });
 }
 
-// Check if user is authenticated
+// Check if user is authenticated with extended expiration
 function isAuthenticated() {
     const expiresAt = JSON.parse(localStorage.getItem('expires_at') || '0');
-    return new Date().getTime() < expiresAt;
+    const accessToken = localStorage.getItem('access_token');
+    
+    // If we have a token but it's close to expiring, try to extend the session
+    if (accessToken && expiresAt) {
+        const timeUntilExpiry = expiresAt - new Date().getTime();
+        const oneDayInMs = 24 * 60 * 60 * 1000;
+        
+        // If token expires in less than a day, extend it
+        if (timeUntilExpiry > 0 && timeUntilExpiry < oneDayInMs) {
+            // Extend expiration by 30 days
+            const newExpiresAt = new Date().getTime() + (30 * oneDayInMs);
+            localStorage.setItem('expires_at', JSON.stringify(newExpiresAt));
+            return true;
+        }
+        
+        return new Date().getTime() < expiresAt;
+    }
+    
+    return false;
 }
 
 // Get current user

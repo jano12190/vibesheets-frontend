@@ -875,3 +875,69 @@
                 padding: 12px 20px;
             }
         }
+        
+        /* Time editing form styles */
+        .time-edit-form {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .time-inputs {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .time-inputs label {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .time-input {
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 6px;
+            padding: 8px 12px;
+            color: #333;
+            font-size: 14px;
+            width: 120px;
+        }
+        
+        .time-input:focus {
+            outline: none;
+            border-color: #43cea2;
+            box-shadow: 0 0 0 2px rgba(67, 206, 162, 0.2);
+        }
+        
+        .edit-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .save-time-btn, .cancel-time-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            padding: 8px 16px;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+        
+        .save-time-btn {
+            background: #43cea2;
+        }
+        
+        .save-time-btn:hover {
+            background: #37b58e;
+        }
+        
+        .cancel-time-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }

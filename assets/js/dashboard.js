@@ -29,7 +29,7 @@ async function initializeDashboard() {
     ]);
     
     // Setup period select options
-    setupPeriodSelect();
+    await setupPeriodSelect();
     
     // Setup date filter
     setupDateFilter();
@@ -187,16 +187,24 @@ async function loadMonthlyHours() {
     }
 }
 
-// Load time entries
+// Load time entries (default to today)
 async function loadTimeEntries() {
     try {
-        const response = await apiCall('/timesheets', 'GET');
+        // Default to today's entries
+        const today = formatDate(new Date());
+        const response = await apiCall(`/timesheets?start_date=${today}&end_date=${today}`, 'GET');
         
         if (response.ok) {
             const data = await response.json();
             // Handle both possible response formats
             const entries = data.entries || data.timesheets || [];
             displayTimeEntries(entries);
+            
+            // Set the date filter to "today" by default
+            const dateFilter = document.getElementById('dateFilter');
+            if (dateFilter) {
+                dateFilter.value = 'today';
+            }
         }
     } catch (error) {
         console.error('Failed to load time entries:', error);
@@ -293,8 +301,7 @@ function displayTimeEntries(data) {
                     </div>
                     <div class="entry-duration">
                         <span class="duration-display">${duration}</span>
-                        <input type="number" class="hours-edit" value="${hours}" step="0.01" min="0" style="display: none;" onblur="saveHoursEdit(this)" onkeypress="handleEditKeypress(event, this)">
-                        <button class="edit-hours-btn" onclick="editHours(this)" title="Edit hours">✎</button>
+                        <button class="edit-hours-btn" onclick="editHours(this)" title="Edit times">✎</button>
                     </div>
                 </div>
             `;
@@ -305,8 +312,8 @@ function displayTimeEntries(data) {
 }
 
 
-// Setup period select options
-function setupPeriodSelect() {
+// Setup period select options based on user's time entries
+async function setupPeriodSelect() {
     const select = document.getElementById('periodSelect');
     const optgroup = select.querySelector('optgroup[label="Available Months"]');
     
@@ -318,25 +325,84 @@ function setupPeriodSelect() {
         'July', 'August', 'September', 'October', 'November', 'December'
     ];
     
-    const currentDate = new Date();
-    const currentYear = currentDate.getFullYear();
-    const currentMonth = currentDate.getMonth(); // 0-based
-    
-    // Only show months from current month onwards for current year
-    for (let month = currentMonth; month < 12; month++) {
-        const option = document.createElement('option');
-        option.value = `${currentYear}-${String(month + 1).padStart(2, '0')}`;
-        option.textContent = `${months[month]} ${currentYear}`;
-        optgroup.appendChild(option);
-    }
-    
-    // Add next year's months if we're near year end
-    if (currentMonth >= 10) { // November or December
-        const nextYear = currentYear + 1;
-        for (let month = 0; month < 12; month++) {
+    try {
+        // Get all user's time entries to find their first month
+        const response = await apiCall('/timesheets', 'GET');
+        if (response.ok) {
+            const data = await response.json();
+            const entries = data.entries || data.timesheets || [];
+            
+            let allDates = [];
+            if (Array.isArray(entries)) {
+                if (entries.length > 0 && entries[0].entries) {
+                    // Grouped format: extract dates from all day groups
+                    allDates = entries.map(day => day.date).filter(Boolean);
+                } else {
+                    // Direct entries format: extract dates from timestamps
+                    allDates = entries.map(entry => {
+                        const date = entry.date || entry.timestamp.split('T')[0];
+                        return date;
+                    }).filter(Boolean);
+                }
+            }
+            
+            if (allDates.length > 0) {
+                // Find the earliest date
+                const earliestDate = new Date(Math.min(...allDates.map(d => new Date(d))));
+                const latestDate = new Date(Math.max(...allDates.map(d => new Date(d))));
+                
+                // Generate options from earliest month to current month + 12 months
+                const currentDate = new Date();
+                const endDate = new Date(currentDate.getFullYear() + 1, currentDate.getMonth(), 1);
+                
+                let currentMonth = new Date(earliestDate.getFullYear(), earliestDate.getMonth(), 1);
+                
+                while (currentMonth <= endDate) {
+                    const year = currentMonth.getFullYear();
+                    const month = currentMonth.getMonth();
+                    
+                    const option = document.createElement('option');
+                    option.value = `${year}-${String(month + 1).padStart(2, '0')}`;
+                    option.textContent = `${months[month]} ${year}`;
+                    optgroup.appendChild(option);
+                    
+                    // Move to next month
+                    currentMonth.setMonth(currentMonth.getMonth() + 1);
+                }
+            } else {
+                // Fallback: show current month onwards if no entries exist
+                const currentDate = new Date();
+                const currentYear = currentDate.getFullYear();
+                const currentMonth = currentDate.getMonth();
+                
+                for (let month = currentMonth; month < 12; month++) {
+                    const option = document.createElement('option');
+                    option.value = `${currentYear}-${String(month + 1).padStart(2, '0')}`;
+                    option.textContent = `${months[month]} ${currentYear}`;
+                    optgroup.appendChild(option);
+                }
+                
+                // Add next year
+                const nextYear = currentYear + 1;
+                for (let month = 0; month < 12; month++) {
+                    const option = document.createElement('option');
+                    option.value = `${nextYear}-${String(month + 1).padStart(2, '0')}`;
+                    option.textContent = `${months[month]} ${nextYear}`;
+                    optgroup.appendChild(option);
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Failed to setup period select:', error);
+        // Fallback to basic setup
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        const currentMonth = currentDate.getMonth();
+        
+        for (let month = currentMonth; month < 12; month++) {
             const option = document.createElement('option');
-            option.value = `${nextYear}-${String(month + 1).padStart(2, '0')}`;
-            option.textContent = `${months[month]} ${nextYear}`;
+            option.value = `${currentYear}-${String(month + 1).padStart(2, '0')}`;
+            option.textContent = `${months[month]} ${currentYear}`;
             optgroup.appendChild(option);
         }
     }
@@ -406,10 +472,15 @@ async function exportPDF() {
     }
 }
 
-// Setup date filter
+// Setup date filter with calendar
 function setupDateFilter() {
     const dateFilter = document.getElementById('dateFilter');
     const specificDateInput = document.getElementById('specificDateInput');
+    const specificDate = document.getElementById('specificDate');
+    
+    // Set default date to today
+    const today = new Date();
+    specificDate.value = formatDate(today);
     
     dateFilter.addEventListener('change', function() {
         if (this.value === 'specific-date') {
@@ -417,6 +488,13 @@ function setupDateFilter() {
         } else {
             specificDateInput.style.display = 'none';
             filterTimeEntries(this.value);
+        }
+    });
+    
+    // Handle calendar date change
+    specificDate.addEventListener('change', function() {
+        if (this.value) {
+            filterBySpecificDate();
         }
     });
 }
@@ -566,70 +644,167 @@ function calculateDuration(clockIn, clockOut) {
     return diffHours.toFixed(2) + 'h';
 }
 
-// Edit hours functionality
+// Edit time functionality (clock in/out times instead of hours)
 function editHours(button) {
     const entryDiv = button.closest('.time-entry');
-    const durationDisplay = entryDiv.querySelector('.duration-display');
-    const hoursEdit = entryDiv.querySelector('.hours-edit');
+    const entryId = entryDiv.dataset.entryId;
     
-    durationDisplay.style.display = 'none';
-    hoursEdit.style.display = 'inline-block';
-    hoursEdit.focus();
-    hoursEdit.select();
+    // Get current times from the entry
+    const entryTimesDiv = entryDiv.querySelector('.entry-times');
+    const timesText = entryTimesDiv.textContent;
+    
+    // Extract clock in and clock out times
+    const inMatch = timesText.match(/In: (\d{1,2}:\d{2} [AP]M|--:--)/);  
+    const outMatch = timesText.match(/Out: (\d{1,2}:\d{2} [AP]M|--:--)/);;    
+    const clockInTime = inMatch ? inMatch[1] : '--:--';
+    const clockOutTime = outMatch ? outMatch[1] : '--:--';
+    
+    // Create edit form
+    const editForm = document.createElement('div');
+    editForm.className = 'time-edit-form';
+    editForm.innerHTML = `
+        <div class="time-inputs">
+            <label>Clock In:</label>
+            <input type="time" class="time-input" id="clockInTime" value="${convertTo24Hour(clockInTime)}">
+            <label>Clock Out:</label>
+            <input type="time" class="time-input" id="clockOutTime" value="${convertTo24Hour(clockOutTime)}">
+        </div>
+        <div class="edit-buttons">
+            <button class="save-time-btn" onclick="saveTimeEdit('${entryId}')">Save</button>
+            <button class="cancel-time-btn" onclick="cancelTimeEdit()">Cancel</button>
+        </div>
+    `;
+    
+    // Replace the entry times with edit form
+    entryTimesDiv.style.display = 'none';
+    entryTimesDiv.parentNode.insertBefore(editForm, entryTimesDiv.nextSibling);
     button.style.display = 'none';
 }
 
-function saveHoursEdit(input) {
-    const entryDiv = input.closest('.time-entry');
-    const durationDisplay = entryDiv.querySelector('.duration-display');
-    const editButton = entryDiv.querySelector('.edit-hours-btn');
-    const entryId = entryDiv.dataset.entryId;
-    const newHours = parseFloat(input.value) || 0;
+function saveTimeEdit(entryId) {
+    const editForm = document.querySelector('.time-edit-form');
+    const clockInInput = editForm.querySelector('#clockInTime');
+    const clockOutInput = editForm.querySelector('#clockOutTime');
     
-    // Update display
-    durationDisplay.textContent = newHours.toFixed(2) + 'h';
-    durationDisplay.style.display = 'inline-block';
-    input.style.display = 'none';
-    editButton.style.display = 'inline-block';
+    const clockInTime = clockInInput.value;
+    const clockOutTime = clockOutInput.value;
+    
+    if (!clockInTime && !clockOutTime) {
+        alert('Please enter at least one time.');
+        return;
+    }
+    
+    // Convert times to timestamps for the current date
+    const entryDiv = document.querySelector(`[data-entry-id="${entryId}"]`);
+    const dateText = entryDiv.querySelector('.entry-date').textContent;
     
     // Save to backend
-    updateTimeEntryHours(entryId, newHours);
+    updateTimeEntryTimes(entryId, clockInTime, clockOutTime, dateText);
+    
+    // Clean up edit form
+    cancelTimeEdit();
 }
 
-function handleEditKeypress(event, input) {
-    if (event.key === 'Enter') {
-        input.blur();
-    } else if (event.key === 'Escape') {
-        const entryDiv = input.closest('.time-entry');
-        const durationDisplay = entryDiv.querySelector('.duration-display');
-        const editButton = entryDiv.querySelector('.edit-hours-btn');
+function cancelTimeEdit() {
+    const editForm = document.querySelector('.time-edit-form');
+    if (editForm) {
+        const entryTimesDiv = editForm.previousSibling;
+        const editButton = editForm.parentNode.querySelector('.edit-hours-btn');
         
-        durationDisplay.style.display = 'inline-block';
-        input.style.display = 'none';
+        entryTimesDiv.style.display = 'block';
         editButton.style.display = 'inline-block';
+        editForm.remove();
     }
 }
 
-async function updateTimeEntryHours(entryId, hours) {
+function convertTo24Hour(time12h) {
+    if (time12h === '--:--' || !time12h) return '';
+    
+    const [time, modifier] = time12h.split(' ');
+    let [hours, minutes] = time.split(':');
+    
+    if (hours === '12') {
+        hours = '00';
+    }
+    
+    if (modifier === 'PM') {
+        hours = parseInt(hours, 10) + 12;
+    }
+    
+    return `${String(hours).padStart(2, '0')}:${minutes}`;
+}
+
+function convertTo12Hour(time24h) {
+    if (!time24h) return '--:--';
+    
+    const [hours, minutes] = time24h.split(':');
+    const hour12 = hours % 12 || 12;
+    const ampm = hours < 12 ? 'AM' : 'PM';
+    
+    return `${hour12}:${minutes} ${ampm}`;
+}
+
+async function updateTimeEntryTimes(entryId, clockInTime, clockOutTime, dateText) {
     try {
+        // Parse the date from the display text
+        const today = new Date();
+        const entryDate = parseDisplayDate(dateText) || today;
+        
+        let clockInTimestamp = null;
+        let clockOutTimestamp = null;
+        
+        if (clockInTime) {
+            const [hours, minutes] = clockInTime.split(':');
+            const clockInDate = new Date(entryDate);
+            clockInDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+            clockInTimestamp = clockInDate.toISOString();
+        }
+        
+        if (clockOutTime) {
+            const [hours, minutes] = clockOutTime.split(':');
+            const clockOutDate = new Date(entryDate);
+            clockOutDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+            clockOutTimestamp = clockOutDate.toISOString();
+        }
+        
         const response = await apiCall('/timesheets', 'PUT', {
             timestamp: entryId,
-            hours: hours
+            clock_in_time: clockInTimestamp,
+            clock_out_time: clockOutTimestamp
         });
         
         if (response.ok) {
-            // Refresh monthly hours after successful update
-            await loadMonthlyHours();
+            // Refresh data after successful update
+            await Promise.all([
+                loadMonthlyHours(),
+                loadTimeEntries()
+            ]);
         } else {
             const error = await response.json();
-            alert('Failed to update hours: ' + (error.message || 'Unknown error'));
-            // Reload entries to revert changes
-            await loadTimeEntries();
+            alert('Failed to update times: ' + (error.message || 'Unknown error'));
         }
     } catch (error) {
-        console.error('Error updating hours:', error);
-        alert('Failed to update hours. Please try again.');
-        // Reload entries to revert changes
-        await loadTimeEntries();
+        console.error('Error updating times:', error);
+        alert('Failed to update times. Please try again.');
     }
+}
+
+function parseDisplayDate(dateText) {
+    // Parse date from format like "Mon, Jun 3" back to a Date object
+    const currentYear = new Date().getFullYear();
+    const months = {
+        'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+        'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+    };
+    
+    const parts = dateText.split(', ');
+    if (parts.length === 2) {
+        const [monthStr, day] = parts[1].split(' ');
+        const month = months[monthStr];
+        if (month !== undefined) {
+            return new Date(currentYear, month, parseInt(day));
+        }
+    }
+    
+    return null;
 }
