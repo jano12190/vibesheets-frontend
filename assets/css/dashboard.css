@@ -125,6 +125,52 @@
             box-shadow: 0 6px 20px rgba(231, 76, 60, 0.4);
         }
 
+        /* Edit hours functionality styles */
+        .entry-duration {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .hours-edit {
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 6px;
+            padding: 4px 8px;
+            color: #333;
+            font-size: 14px;
+            width: 80px;
+            text-align: center;
+        }
+
+        .hours-edit:focus {
+            outline: none;
+            border-color: #43cea2;
+            box-shadow: 0 0 0 2px rgba(67, 206, 162, 0.2);
+        }
+
+        .edit-hours-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            padding: 4px 6px;
+            font-size: 12px;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 24px;
+            height: 24px;
+        }
+
+        .edit-hours-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.1);
+        }
+
         .this-month-card {
             text-align: center;
         }
@@ -625,4 +671,50 @@
             background: #c0392b;
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(231, 76, 60, 0.4);
+        }
+
+        /* Edit hours functionality styles */
+        .entry-duration {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .hours-edit {
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 6px;
+            padding: 4px 8px;
+            color: #333;
+            font-size: 14px;
+            width: 80px;
+            text-align: center;
+        }
+
+        .hours-edit:focus {
+            outline: none;
+            border-color: #43cea2;
+            box-shadow: 0 0 0 2px rgba(67, 206, 162, 0.2);
+        }
+
+        .edit-hours-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            padding: 4px 6px;
+            font-size: 12px;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 24px;
+            height: 24px;
+        }
+
+        .edit-hours-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.1);
         }

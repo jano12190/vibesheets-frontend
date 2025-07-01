@@ -48,7 +48,7 @@ function displayUserInfo() {
 function updateClock() {
     const now = new Date();
     const timeString = now.toLocaleTimeString('en-US', { 
-        hour12: false,
+        hour12: true,
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit'
@@ -160,12 +160,17 @@ async function loadMonthlyHours() {
                     // Grouped format: sum hours from all days
                     totalHours = entries.reduce((sum, day) => {
                         const dayTotal = day.totalHours || 
-                            (day.entries ? day.entries.reduce((daySum, entry) => daySum + (entry.hours || 0), 0) : 0);
+                            (day.entries ? day.entries.reduce((daySum, entry) => {
+                                // Only count hours from clock_out entries
+                                return daySum + (entry.type === 'clock_out' ? (entry.hours || 0) : 0);
+                            }, 0) : 0);
                         return sum + dayTotal;
                     }, 0);
                 } else {
-                    // Direct entries format: sum all hours
-                    totalHours = entries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
+                    // Direct entries format: sum hours from clock_out entries only
+                    totalHours = entries.reduce((sum, entry) => {
+                        return sum + (entry.type === 'clock_out' ? (entry.hours || 0) : 0);
+                    }, 0);
                 }
             }
             
@@ -245,13 +250,13 @@ function displayTimeEntries(data) {
         let currentPair = null;
         
         dayEntries.forEach(entry => {
-            if (entry.type === 'in') {
+            if (entry.type === 'clock_in') {
                 if (currentPair) {
                     // Previous pair was incomplete, add it anyway
                     pairs.push(currentPair);
                 }
                 currentPair = { clockIn: entry, clockOut: null };
-            } else if (entry.type === 'out') {
+            } else if (entry.type === 'clock_out') {
                 if (currentPair) {
                     currentPair.clockOut = entry;
                     pairs.push(currentPair);
@@ -269,14 +274,16 @@ function displayTimeEntries(data) {
         }
         
         // Generate HTML for each pair
-        pairs.forEach(pair => {
+        pairs.forEach((pair, index) => {
             const clockInTime = pair.clockIn ? formatTimeOnly(pair.clockIn.timestamp) : '--:--';
             const clockOutTime = pair.clockOut ? formatTimeOnly(pair.clockOut.timestamp) : '--:--';
             const duration = calculateDuration(pair.clockIn, pair.clockOut);
             const displayDate = formatDateOnly(date);
+            const hours = pair.clockOut ? (pair.clockOut.hours || 0) : 0;
+            const entryId = pair.clockOut ? pair.clockOut.timestamp : pair.clockIn?.timestamp || `${date}-${index}`;
             
             entriesHtml += `
-                <div class="time-entry">
+                <div class="time-entry" data-entry-id="${entryId}">
                     <div class="entry-info">
                         <div class="entry-status"></div>
                         <div class="entry-details">
@@ -284,7 +291,11 @@ function displayTimeEntries(data) {
                             <div class="entry-times">In: ${clockInTime} | Out: ${clockOutTime}</div>
                         </div>
                     </div>
-                    <div class="entry-duration">${duration}</div>
+                    <div class="entry-duration">
+                        <span class="duration-display">${duration}</span>
+                        <input type="number" class="hours-edit" value="${hours}" step="0.01" min="0" style="display: none;" onblur="saveHoursEdit(this)" onkeypress="handleEditKeypress(event, this)">
+                        <button class="edit-hours-btn" onclick="editHours(this)" title="Edit hours">✎</button>
+                    </div>
                 </div>
             `;
         });
@@ -380,7 +391,7 @@ async function exportPDF() {
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `timesheet_${startDate}_to_${endDate}.csv`;
+            a.download = `timesheet_${startDate}_to_${endDate}.pdf`;
             document.body.appendChild(a);
             a.click();
             window.URL.revokeObjectURL(url);
@@ -529,7 +540,7 @@ function formatTimeOnly(timestamp) {
     return date.toLocaleTimeString('en-US', {
         hour: '2-digit',
         minute: '2-digit',
-        hour12: false
+        hour12: true
     });
 }
 
@@ -553,4 +564,72 @@ function calculateDuration(clockIn, clockOut) {
     const diffHours = diffMs / (1000 * 60 * 60);
     
     return diffHours.toFixed(2) + 'h';
+}
+
+// Edit hours functionality
+function editHours(button) {
+    const entryDiv = button.closest('.time-entry');
+    const durationDisplay = entryDiv.querySelector('.duration-display');
+    const hoursEdit = entryDiv.querySelector('.hours-edit');
+    
+    durationDisplay.style.display = 'none';
+    hoursEdit.style.display = 'inline-block';
+    hoursEdit.focus();
+    hoursEdit.select();
+    button.style.display = 'none';
+}
+
+function saveHoursEdit(input) {
+    const entryDiv = input.closest('.time-entry');
+    const durationDisplay = entryDiv.querySelector('.duration-display');
+    const editButton = entryDiv.querySelector('.edit-hours-btn');
+    const entryId = entryDiv.dataset.entryId;
+    const newHours = parseFloat(input.value) || 0;
+    
+    // Update display
+    durationDisplay.textContent = newHours.toFixed(2) + 'h';
+    durationDisplay.style.display = 'inline-block';
+    input.style.display = 'none';
+    editButton.style.display = 'inline-block';
+    
+    // Save to backend
+    updateTimeEntryHours(entryId, newHours);
+}
+
+function handleEditKeypress(event, input) {
+    if (event.key === 'Enter') {
+        input.blur();
+    } else if (event.key === 'Escape') {
+        const entryDiv = input.closest('.time-entry');
+        const durationDisplay = entryDiv.querySelector('.duration-display');
+        const editButton = entryDiv.querySelector('.edit-hours-btn');
+        
+        durationDisplay.style.display = 'inline-block';
+        input.style.display = 'none';
+        editButton.style.display = 'inline-block';
+    }
+}
+
+async function updateTimeEntryHours(entryId, hours) {
+    try {
+        const response = await apiCall('/timesheets', 'PUT', {
+            timestamp: entryId,
+            hours: hours
+        });
+        
+        if (response.ok) {
+            // Refresh monthly hours after successful update
+            await loadMonthlyHours();
+        } else {
+            const error = await response.json();
+            alert('Failed to update hours: ' + (error.message || 'Unknown error'));
+            // Reload entries to revert changes
+            await loadTimeEntries();
+        }
+    } catch (error) {
+        console.error('Error updating hours:', error);
+        alert('Failed to update hours. Please try again.');
+        // Reload entries to revert changes
+        await loadTimeEntries();
+    }
 }
