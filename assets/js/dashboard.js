@@ -547,7 +547,7 @@ async function exportPDF() {
             const contentType = response.headers.get('content-type');
             
             if (contentType && contentType.includes('application/pdf')) {
-                // Handle PDF response
+                // Handle direct PDF response
                 const blob = await response.blob();
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -557,42 +557,70 @@ async function exportPDF() {
                 document.body.appendChild(a);
                 a.click();
                 
-                // Clean up after a short delay
-                setTimeout(() => {
-                    window.URL.revokeObjectURL(url);
-                    document.body.removeChild(a);
-                }, 100);
-            } else if (contentType && contentType.includes('text/csv')) {
-                // Handle CSV response (fallback)
-                const text = await response.text();
-                const blob = new Blob([text], { type: 'text/csv' });
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `timesheet_${startDate}_to_${endDate}.csv`;
-                a.style.display = 'none';
-                document.body.appendChild(a);
-                a.click();
-                
                 setTimeout(() => {
                     window.URL.revokeObjectURL(url);
                     document.body.removeChild(a);
                 }, 100);
             } else {
-                // Try to handle as blob anyway
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `timesheet_${startDate}_to_${endDate}`;
-                a.style.display = 'none';
-                document.body.appendChild(a);
-                a.click();
-                
-                setTimeout(() => {
-                    window.URL.revokeObjectURL(url);
-                    document.body.removeChild(a);
-                }, 100);
+                // Try to parse as JSON first (common response from API Gateway)
+                try {
+                    const text = await response.text();
+                    let jsonResponse;
+                    
+                    try {
+                        jsonResponse = JSON.parse(text);
+                    } catch (jsonError) {
+                        // Not JSON, treat as binary
+                        const blob = new Blob([text], { type: 'application/pdf' });
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `timesheet_${startDate}_to_${endDate}.pdf`;
+                        a.style.display = 'none';
+                        document.body.appendChild(a);
+                        a.click();
+                        
+                        setTimeout(() => {
+                            window.URL.revokeObjectURL(url);
+                            document.body.removeChild(a);
+                        }, 100);
+                        return;
+                    }
+                    
+                    // Check if it's a base64 encoded PDF in body
+                    if (jsonResponse.body && typeof jsonResponse.body === 'string') {
+                        try {
+                            // Decode base64 and create blob
+                            const binaryString = atob(jsonResponse.body);
+                            const bytes = new Uint8Array(binaryString.length);
+                            for (let i = 0; i < binaryString.length; i++) {
+                                bytes[i] = binaryString.charCodeAt(i);
+                            }
+                            const blob = new Blob([bytes], { type: 'application/pdf' });
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `timesheet_${startDate}_to_${endDate}.pdf`;
+                            a.style.display = 'none';
+                            document.body.appendChild(a);
+                            a.click();
+                            
+                            setTimeout(() => {
+                                window.URL.revokeObjectURL(url);
+                                document.body.removeChild(a);
+                            }, 100);
+                        } catch (base64Error) {
+                            console.error('Failed to decode base64 PDF:', base64Error);
+                            alert('Failed to download PDF. The file may be corrupted.');
+                        }
+                    } else {
+                        // Regular JSON response, not a file
+                        alert('Received unexpected response format from server.');
+                    }
+                } catch (textError) {
+                    console.error('Failed to process response:', textError);
+                    alert('Failed to process server response.');
+                }
             }
         } else {
             const error = await response.json();
@@ -727,7 +755,7 @@ function formatTimeOnly(timestamp) {
 }
 
 function formatDateOnly(dateString) {
-    const date = new Date(dateString);
+    const date = new Date(dateString + 'T12:00:00'); // Add time to prevent timezone issues
     return date.toLocaleDateString('en-US', {
         weekday: 'short',
         month: 'short',
@@ -918,7 +946,8 @@ function parseDisplayDate(dateText) {
         const [monthStr, day] = parts[1].split(' ');
         const month = months[monthStr];
         if (month !== undefined) {
-            return new Date(currentYear, month, parseInt(day));
+            // Create date at noon to avoid timezone issues
+            return new Date(currentYear, month, parseInt(day), 12, 0, 0);
         }
     }
     
@@ -937,22 +966,19 @@ async function deleteTimeEntry(entryId) {
         });
         
         if (response.ok) {
-            // Refresh data after successful deletion
-            const hoursPeriodSelect = document.getElementById('hoursPeriodSelect');
-            const currentPeriod = hoursPeriodSelect ? hoursPeriodSelect.value : 'today';
-            
-            await Promise.all([
-                loadHours(currentPeriod),
-                loadTimeEntries()
-            ]);
-            
             // Show success message briefly
             const container = document.getElementById('timeEntriesContainer');
-            const originalContent = container.innerHTML;
             container.innerHTML = '<div style="color: #43cea2; text-align: center; padding: 20px;">✓ Time entry deleted successfully</div>';
             
-            setTimeout(() => {
-                loadTimeEntries();
+            // Refresh data after showing success message
+            setTimeout(async () => {
+                const hoursPeriodSelect = document.getElementById('hoursPeriodSelect');
+                const currentPeriod = hoursPeriodSelect ? hoursPeriodSelect.value : 'today';
+                
+                await Promise.all([
+                    loadHours(currentPeriod),
+                    filterBySpecificDate() // Use current date filter instead of loadTimeEntries()
+                ]);
             }, 1500);
         } else {
             const error = await response.json();
