@@ -624,7 +624,7 @@
             
             .mobile-logout {
                 position: fixed;
-                bottom: 20px;
+                bottom: max(20px, env(safe-area-inset-bottom, 20px));
                 left: 50%;
                 transform: translateX(-50%);
                 background: rgba(255, 255, 255, 0.15);
@@ -650,8 +650,18 @@
                 box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
             }
             
+            /* Ensure body keeps gradient background on mobile */
+            body {
+                background: linear-gradient(135deg, #43cea2, #185a9d) !important;
+                min-height: 100vh;
+            }
+            
             .dashboard-grid, .export-card, .time-entries-card {
                 margin-top: 80px;
+            }
+            
+            .time-entries-card {
+                margin-bottom: 100px;
             }
             
             .logo {

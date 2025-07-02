@@ -16,13 +16,44 @@ document.addEventListener('DOMContentLoaded', async function() {
     document.documentElement.style.visibility = 'visible';
     
     try {
-        // Get Auth0 configuration from API
-        const response = await fetch('https://api.vibesheets.com/auth');
-        if (!response.ok) {
-            throw new Error('Failed to load auth configuration');
+        // Get Auth0 configuration from API with retry logic
+        let config = null;
+        let attempts = 0;
+        const maxAttempts = 3;
+        
+        while (attempts < maxAttempts) {
+            try {
+                const response = await fetch('https://api.vibesheets.com/auth');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                config = await response.json();
+                break;
+            } catch (fetchError) {
+                attempts++;
+                console.warn(`Auth config fetch attempt ${attempts} failed:`, fetchError);
+                if (attempts < maxAttempts) {
+                    // Wait before retrying (exponential backoff)
+                    await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
+                } else {
+                    throw new Error(`Failed to load auth configuration after ${maxAttempts} attempts: ${fetchError.message}`);
+                }
+            }
         }
-        const config = await response.json();
+        
+        if (!config || !config.auth0) {
+            throw new Error('Invalid auth configuration received');
+        }
+        
         authConfig = config.auth0; // Extract auth0 config from response
+        
+        // Validate required auth config fields
+        const requiredFields = ['domain', 'clientId', 'redirectUri', 'audience', 'scope'];
+        for (const field of requiredFields) {
+            if (!authConfig[field]) {
+                throw new Error(`Missing required auth config field: ${field}`);
+            }
+        }
         
         // Initialize Auth0 client
         auth0Client = new auth0.WebAuth({
@@ -76,7 +107,14 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     } catch (error) {
         console.error('Failed to initialize auth:', error);
-        showError('Failed to initialize authentication. Please try again.');
+        showError('Authentication initialization failed. Please refresh the page or try again later.');
+        
+        // Hide login buttons to prevent confusing user
+        const buttons = document.querySelectorAll('.login-btn');
+        buttons.forEach(btn => {
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+        });
     }
 });
 

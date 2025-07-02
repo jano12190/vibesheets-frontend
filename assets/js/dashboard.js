@@ -118,8 +118,14 @@ async function clockIn() {
                 loadTimeEntries()
             ]);
         } else {
-            const error = await response.json();
-            alert('Failed to clock in: ' + (error.message || 'Unknown error'));
+            let errorMessage = 'Failed to clock in. Please try again.';
+            try {
+                const error = await response.json();
+                errorMessage = 'Failed to clock in: ' + (error.error || error.message || 'Unknown error');
+            } catch (e) {
+                console.warn('Could not parse error response:', e);
+            }
+            alert(errorMessage);
         }
     } catch (error) {
         console.error('Clock in error:', error);
@@ -146,8 +152,14 @@ async function clockOut() {
                 loadTimeEntries()
             ]);
         } else {
-            const error = await response.json();
-            alert('Failed to clock out: ' + (error.message || 'Unknown error'));
+            let errorMessage = 'Failed to clock out. Please try again.';
+            try {
+                const error = await response.json();
+                errorMessage = 'Failed to clock out: ' + (error.error || error.message || 'Unknown error');
+            } catch (e) {
+                console.warn('Could not parse error response:', e);
+            }
+            alert(errorMessage);
         }
     } catch (error) {
         console.error('Clock out error:', error);
@@ -293,32 +305,48 @@ function displayTimeEntries(data) {
             new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
         );
         
-        // Group clock-in and clock-out pairs
+        // Group clock-in and clock-out pairs more intelligently
         const pairs = [];
-        let currentPair = null;
+        let i = 0;
         
-        dayEntries.forEach(entry => {
+        while (i < dayEntries.length) {
+            const entry = dayEntries[i];
+            
             if (entry.type === 'clock_in') {
-                if (currentPair) {
-                    // Previous pair was incomplete, add it anyway
-                    pairs.push(currentPair);
+                // Look for the next clock_out entry
+                let clockOutEntry = null;
+                let j = i + 1;
+                
+                while (j < dayEntries.length) {
+                    if (dayEntries[j].type === 'clock_out') {
+                        clockOutEntry = dayEntries[j];
+                        break;
+                    }
+                    j++;
                 }
-                currentPair = { clockIn: entry, clockOut: null };
-            } else if (entry.type === 'clock_out') {
-                if (currentPair) {
-                    currentPair.clockOut = entry;
-                    pairs.push(currentPair);
-                    currentPair = null;
+                
+                // Only show clock_in entries that have a corresponding clock_out
+                if (clockOutEntry) {
+                    pairs.push({ clockIn: entry, clockOut: clockOutEntry });
+                    // Skip to the position after the clock_out we just paired
+                    i = j + 1;
                 } else {
-                    // Clock out without clock in, show as standalone
+                    // Incomplete clock_in without clock_out - skip it unless it's the most recent entry
+                    const isCurrentlyWorking = i === dayEntries.length - 1 && entry.date === formatDate(new Date());
+                    if (isCurrentlyWorking) {
+                        pairs.push({ clockIn: entry, clockOut: null });
+                    }
+                    i++;
+                }
+            } else if (entry.type === 'clock_out') {
+                // Orphaned clock_out without prior clock_in - only show if it has valid hours
+                if (entry.hours && entry.hours > 0) {
                     pairs.push({ clockIn: null, clockOut: entry });
                 }
+                i++;
+            } else {
+                i++;
             }
-        });
-        
-        // Add incomplete pair if exists
-        if (currentPair) {
-            pairs.push(currentPair);
         }
         
         // Generate HTML for each pair
@@ -506,7 +534,8 @@ async function exportPDF() {
         
         const response = await apiCall('/export', 'POST', {
             start_date: startDate,
-            end_date: endDate
+            end_date: endDate,
+            format: 'pdf'
         });
         
         // Reset button state
@@ -653,7 +682,13 @@ async function apiCall(endpoint, method, body) {
         options.body = JSON.stringify(body);
     }
     
-    return fetch(`https://api.vibesheets.com${endpoint}`, options);
+    console.log(`API Call: ${method} ${endpoint}`, body ? body : 'no body');
+    
+    const response = await fetch(`https://api.vibesheets.com${endpoint}`, options);
+    
+    console.log(`API Response: ${response.status} ${response.statusText}`);
+    
+    return response;
 }
 
 // Utility functions
