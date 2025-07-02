@@ -200,10 +200,10 @@ async function loadTimeEntries() {
             const entries = data.entries || data.timesheets || [];
             displayTimeEntries(entries);
             
-            // Set the date filter to "today" by default
+            // Set the date filter to today's date by default
             const dateFilter = document.getElementById('dateFilter');
             if (dateFilter) {
-                dateFilter.value = 'today';
+                dateFilter.value = formatDate(new Date());
             }
         }
     } catch (error) {
@@ -351,13 +351,13 @@ async function setupPeriodSelect() {
                 const earliestDate = new Date(Math.min(...allDates.map(d => new Date(d))));
                 const latestDate = new Date(Math.max(...allDates.map(d => new Date(d))));
                 
-                // Generate options from earliest month to current month + 12 months
+                // Generate options from earliest month to current month only (no future months)
                 const currentDate = new Date();
-                const endDate = new Date(currentDate.getFullYear() + 1, currentDate.getMonth(), 1);
+                const endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1); // Up to current month only
                 
                 let currentMonth = new Date(earliestDate.getFullYear(), earliestDate.getMonth(), 1);
                 
-                while (currentMonth <= endDate) {
+                while (currentMonth < endDate) {
                     const year = currentMonth.getFullYear();
                     const month = currentMonth.getMonth();
                     
@@ -370,41 +370,28 @@ async function setupPeriodSelect() {
                     currentMonth.setMonth(currentMonth.getMonth() + 1);
                 }
             } else {
-                // Fallback: show current month onwards if no entries exist
+                // Fallback: show only current month if no entries exist
                 const currentDate = new Date();
                 const currentYear = currentDate.getFullYear();
                 const currentMonth = currentDate.getMonth();
                 
-                for (let month = currentMonth; month < 12; month++) {
-                    const option = document.createElement('option');
-                    option.value = `${currentYear}-${String(month + 1).padStart(2, '0')}`;
-                    option.textContent = `${months[month]} ${currentYear}`;
-                    optgroup.appendChild(option);
-                }
-                
-                // Add next year
-                const nextYear = currentYear + 1;
-                for (let month = 0; month < 12; month++) {
-                    const option = document.createElement('option');
-                    option.value = `${nextYear}-${String(month + 1).padStart(2, '0')}`;
-                    option.textContent = `${months[month]} ${nextYear}`;
-                    optgroup.appendChild(option);
-                }
+                const option = document.createElement('option');
+                option.value = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+                option.textContent = `${months[currentMonth]} ${currentYear}`;
+                optgroup.appendChild(option);
             }
         }
     } catch (error) {
         console.error('Failed to setup period select:', error);
-        // Fallback to basic setup
+        // Fallback to basic setup - only current month
         const currentDate = new Date();
         const currentYear = currentDate.getFullYear();
         const currentMonth = currentDate.getMonth();
         
-        for (let month = currentMonth; month < 12; month++) {
-            const option = document.createElement('option');
-            option.value = `${currentYear}-${String(month + 1).padStart(2, '0')}`;
-            option.textContent = `${months[month]} ${currentYear}`;
-            optgroup.appendChild(option);
-        }
+        const option = document.createElement('option');
+        option.value = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+        option.textContent = `${months[currentMonth]} ${currentYear}`;
+        optgroup.appendChild(option);
     }
 }
 
@@ -472,87 +459,35 @@ async function exportPDF() {
     }
 }
 
-// Setup date filter with calendar
+// Setup date filter with calendar only
 function setupDateFilter() {
     const dateFilter = document.getElementById('dateFilter');
-    const specificDateInput = document.getElementById('specificDateInput');
-    const specificDate = document.getElementById('specificDate');
     
     // Set default date to today
     const today = new Date();
-    specificDate.value = formatDate(today);
-    
-    dateFilter.addEventListener('change', function() {
-        if (this.value === 'specific-date') {
-            specificDateInput.style.display = 'flex';
-        } else {
-            specificDateInput.style.display = 'none';
-            filterTimeEntries(this.value);
-        }
-    });
+    dateFilter.value = formatDate(today);
     
     // Handle calendar date change
-    specificDate.addEventListener('change', function() {
+    dateFilter.addEventListener('change', function() {
         if (this.value) {
-            filterBySpecificDate();
+            filterBySpecificDate(this.value);
+        } else {
+            // If no date selected, default to today
+            this.value = formatDate(new Date());
+            filterBySpecificDate(this.value);
         }
     });
 }
 
-// Filter time entries by date
-async function filterTimeEntries(filter) {
-    try {
-        let endpoint = '/timesheets';
-        const now = new Date();
-        
-        switch (filter) {
-            case 'today':
-                const today = formatDate(now);
-                endpoint = `/timesheets?start_date=${today}&end_date=${today}`;
-                break;
-            case 'yesterday':
-                const yesterday = new Date(now);
-                yesterday.setDate(yesterday.getDate() - 1);
-                const yesterdayStr = formatDate(yesterday);
-                endpoint = `/timesheets?start_date=${yesterdayStr}&end_date=${yesterdayStr}`;
-                break;
-            case 'this-week':
-                const startOfWeek = new Date(now);
-                startOfWeek.setDate(now.getDate() - now.getDay());
-                const endOfWeek = new Date(startOfWeek);
-                endOfWeek.setDate(startOfWeek.getDate() + 6);
-                endpoint = `/timesheets?start_date=${formatDate(startOfWeek)}&end_date=${formatDate(endOfWeek)}`;
-                break;
-            case 'this-month':
-                const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-                const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-                endpoint = `/timesheets?start_date=${formatDate(startOfMonth)}&end_date=${formatDate(endOfMonth)}`;
-                break;
-            case 'all':
-            default:
-                endpoint = '/timesheets';
-                break;
-        }
-        
-        const response = await apiCall(endpoint, 'GET');
-        
-        if (response.ok) {
-            const data = await response.json();
-            const entries = data.entries || data.timesheets || [];
-            displayTimeEntries(entries);
-        } else {
-            console.error('Failed to filter time entries');
-            document.getElementById('timeEntriesContainer').innerHTML = '<div class="error">Failed to load filtered entries</div>';
-        }
-    } catch (error) {
-        console.error('Error filtering time entries:', error);
-        document.getElementById('timeEntriesContainer').innerHTML = '<div class="error">Error filtering entries</div>';
-    }
-}
 
 // Filter by specific date
-async function filterBySpecificDate() {
-    const date = document.getElementById('specificDate').value;
+async function filterBySpecificDate(date) {
+    // If no date parameter passed, get it from the date filter
+    if (!date) {
+        const dateFilter = document.getElementById('dateFilter');
+        date = dateFilter ? dateFilter.value : null;
+    }
+    
     if (date) {
         try {
             const response = await apiCall(`/timesheets?start_date=${date}&end_date=${date}`, 'GET');
@@ -570,8 +505,9 @@ async function filterBySpecificDate() {
             document.getElementById('timeEntriesContainer').innerHTML = '<div class="error">Error loading entries for selected date</div>';
         }
     } else {
-        // If no date selected, show all entries
-        loadTimeEntries();
+        // If no date selected, show today's entries
+        const today = formatDate(new Date());
+        filterBySpecificDate(today);
     }
 }
 

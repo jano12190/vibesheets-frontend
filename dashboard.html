@@ -74,19 +74,9 @@
     <div class="card time-entries-card">
         <div class="time-entries-header">
             <h2>Time Entries</h2>
-            <select class="date-filter" id="dateFilter">
-                <option value="today">Today</option>
-                <option value="yesterday">Yesterday</option>
-                <option value="this-week">This Week</option>
-                <option value="this-month">This Month</option>
-                <option value="specific-date">Select Date...</option>
-            </select>
+            <input type="date" class="date-input" id="dateFilter" title="Select date to view entries">
         </div>
         
-        <div class="date-range-inputs" id="specificDateInput" style="margin-bottom: 20px;">
-            <label>Select Date:</label>
-            <input type="date" class="date-input" id="specificDate" onchange="filterBySpecificDate()">
-        </div>
 
         <!-- Time entries will be populated dynamically by JavaScript -->
         <div id="timeEntriesContainer">
