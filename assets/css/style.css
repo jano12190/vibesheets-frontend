@@ -207,8 +207,10 @@ body {
     body {
         padding: 15px;
         min-height: 100vh;
-        align-items: flex-start;
-        padding-top: 60px;
+        align-items: center;
+        flex-direction: column;
+        justify-content: center;
+        padding-top: 15px;
     }
     
     .logo {
@@ -218,6 +220,7 @@ body {
         width: fit-content;
         padding: 12px 24px;
         font-size: 18px;
+        order: 1;
     }
     
     .login-container {
@@ -225,6 +228,7 @@ body {
         max-width: none;
         padding: 30px 25px;
         margin: 0;
+        order: 2;
     }
     
     .login-container h1 {

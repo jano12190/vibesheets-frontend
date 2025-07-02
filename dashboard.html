@@ -47,7 +47,6 @@
                 <option value="this-month">This Month</option>
             </select>
             <div class="hours-display" id="hoursDisplay">0.00h</div>
-            <div class="hours-label" id="hoursLabel">Total Hours</div>
         </div>
     </div>
 
@@ -65,7 +64,7 @@
                 </optgroup>
             </select>
             <button class="export-btn" onclick="exportPDF()">
-                Export Timesheet
+                Export PDF
             </button>
         </div>
         <div class="date-range-inputs" id="dateRangeInputs">
@@ -90,5 +89,27 @@
     </div>
 
     <div class="wave"></div>
+    
+    <!-- Mobile logout button -->
+    <button class="mobile-logout" onclick="logout()" style="display: none;">
+        <img src="assets/exit.png" alt="Exit" style="width: 16px; height: 16px; filter: brightness(0) invert(1);">
+        Logout
+    </button>
+    
+    <script>
+        // Show mobile logout button only on mobile
+        function updateMobileLogout() {
+            const mobileLogout = document.querySelector('.mobile-logout');
+            if (window.innerWidth <= 768) {
+                mobileLogout.style.display = 'flex';
+            } else {
+                mobileLogout.style.display = 'none';
+            }
+        }
+        
+        // Check on load and resize
+        window.addEventListener('load', updateMobileLogout);
+        window.addEventListener('resize', updateMobileLogout);
+    </script>
 </body>
 </html>
