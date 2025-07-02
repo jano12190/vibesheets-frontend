@@ -471,6 +471,15 @@
             color: #fff;
             font-size: 16px;
             text-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .entry-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
         }
 
         .edit-btn {
@@ -983,4 +992,25 @@
         
         .cancel-time-btn:hover {
             background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .delete-entry-btn {
+            background: rgba(255, 76, 60, 0.2);
+            border: 1px solid rgba(255, 76, 60, 0.3);
+            border-radius: 4px;
+            color: #ff4c3c;
+            cursor: pointer;
+            padding: 4px 6px;
+            font-size: 12px;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 24px;
+            height: 24px;
+        }
+        
+        .delete-entry-btn:hover {
+            background: rgba(255, 76, 60, 0.3);
+            transform: scale(1.1);
         }

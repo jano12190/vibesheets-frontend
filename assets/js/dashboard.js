@@ -341,7 +341,10 @@ function displayTimeEntries(data) {
                     </div>
                     <div class="entry-duration">
                         <span class="duration-display">${duration}</span>
-                        <button class="edit-hours-btn" onclick="editHours(this)" title="Edit times">✎</button>
+                        <div class="entry-actions">
+                            <button class="edit-hours-btn" onclick="editHours(this)" title="Edit times">✎</button>
+                            <button class="delete-entry-btn" onclick="deleteTimeEntry('${entryId}')" title="Delete entry">🗑</button>
+                        </div>
                     </div>
                 </div>
             `;
@@ -495,21 +498,73 @@ async function exportPDF() {
     }
     
     try {
+        // Show loading state
+        const exportBtn = document.querySelector('.export-btn');
+        const originalText = exportBtn.textContent;
+        exportBtn.textContent = 'Exporting...';
+        exportBtn.disabled = true;
+        
         const response = await apiCall('/export', 'POST', {
             start_date: startDate,
             end_date: endDate
         });
         
+        // Reset button state
+        exportBtn.textContent = originalText;
+        exportBtn.disabled = false;
+        
         if (response.ok) {
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `timesheet_${startDate}_to_${endDate}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
+            // Check content type
+            const contentType = response.headers.get('content-type');
+            
+            if (contentType && contentType.includes('application/pdf')) {
+                // Handle PDF response
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `timesheet_${startDate}_to_${endDate}.pdf`;
+                a.style.display = 'none';
+                document.body.appendChild(a);
+                a.click();
+                
+                // Clean up after a short delay
+                setTimeout(() => {
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                }, 100);
+            } else if (contentType && contentType.includes('text/csv')) {
+                // Handle CSV response (fallback)
+                const text = await response.text();
+                const blob = new Blob([text], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `timesheet_${startDate}_to_${endDate}.csv`;
+                a.style.display = 'none';
+                document.body.appendChild(a);
+                a.click();
+                
+                setTimeout(() => {
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                }, 100);
+            } else {
+                // Try to handle as blob anyway
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `timesheet_${startDate}_to_${endDate}`;
+                a.style.display = 'none';
+                document.body.appendChild(a);
+                a.click();
+                
+                setTimeout(() => {
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                }, 100);
+            }
         } else {
             const error = await response.json();
             alert('Export failed: ' + (error.message || 'Unknown error'));
@@ -517,6 +572,13 @@ async function exportPDF() {
     } catch (error) {
         console.error('Export error:', error);
         alert('Export failed. Please try again.');
+        
+        // Reset button state on error
+        const exportBtn = document.querySelector('.export-btn');
+        if (exportBtn) {
+            exportBtn.textContent = 'Export Timesheet';
+            exportBtn.disabled = false;
+        }
     }
 }
 
@@ -768,10 +830,18 @@ async function updateTimeEntryTimes(entryId, clockInTime, clockOutTime, dateText
             clockOutTimestamp = clockOutDate.toISOString();
         }
         
+        // Calculate new hours if both times are provided
+        let hours = 0;
+        if (clockInTimestamp && clockOutTimestamp) {
+            const diffMs = new Date(clockOutTimestamp).getTime() - new Date(clockInTimestamp).getTime();
+            hours = diffMs / (1000 * 60 * 60); // Convert milliseconds to hours
+        }
+        
         const response = await apiCall('/timesheets', 'PUT', {
             timestamp: entryId,
-            clock_in_time: clockInTimestamp,
-            clock_out_time: clockOutTimestamp
+            hours: hours,
+            clock_in_timestamp: clockInTimestamp,
+            clock_out_timestamp: clockOutTimestamp
         });
         
         if (response.ok) {
@@ -812,4 +882,43 @@ function parseDisplayDate(dateText) {
     }
     
     return null;
+}
+
+// Delete time entry
+async function deleteTimeEntry(entryId) {
+    if (!confirm('Are you sure you want to delete this time entry? This action cannot be undone.')) {
+        return;
+    }
+    
+    try {
+        const response = await apiCall('/timesheets', 'DELETE', {
+            timestamp: entryId
+        });
+        
+        if (response.ok) {
+            // Refresh data after successful deletion
+            const hoursPeriodSelect = document.getElementById('hoursPeriodSelect');
+            const currentPeriod = hoursPeriodSelect ? hoursPeriodSelect.value : 'today';
+            
+            await Promise.all([
+                loadHours(currentPeriod),
+                loadTimeEntries()
+            ]);
+            
+            // Show success message briefly
+            const container = document.getElementById('timeEntriesContainer');
+            const originalContent = container.innerHTML;
+            container.innerHTML = '<div style="color: #43cea2; text-align: center; padding: 20px;">✓ Time entry deleted successfully</div>';
+            
+            setTimeout(() => {
+                loadTimeEntries();
+            }, 1500);
+        } else {
+            const error = await response.json();
+            alert('Failed to delete time entry: ' + (error.message || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error deleting time entry:', error);
+        alert('Failed to delete time entry. Please try again.');
+    }
 }
