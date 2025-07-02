@@ -700,6 +700,11 @@ function formatDate(date) {
     return `${year}-${month}-${day}`;
 }
 
+function formatDateToUTC(date) {
+    // Convert local date to UTC for API calls
+    return date.toISOString().split('T')[0];
+}
+
 function formatDateTime(timestamp) {
     const date = new Date(timestamp);
     return date.toLocaleString('en-US', {
@@ -716,7 +721,8 @@ function formatTimeOnly(timestamp) {
     return date.toLocaleTimeString('en-US', {
         hour: '2-digit',
         minute: '2-digit',
-        hour12: true
+        hour12: true,
+        timeZone: 'UTC'
     });
 }
 
@@ -854,14 +860,14 @@ async function updateTimeEntryTimes(entryId, clockInTime, clockOutTime, dateText
         if (clockInTime) {
             const [hours, minutes] = clockInTime.split(':');
             const clockInDate = new Date(entryDate);
-            clockInDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+            clockInDate.setUTCHours(parseInt(hours), parseInt(minutes), 0, 0);
             clockInTimestamp = clockInDate.toISOString();
         }
         
         if (clockOutTime) {
             const [hours, minutes] = clockOutTime.split(':');
             const clockOutDate = new Date(entryDate);
-            clockOutDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+            clockOutDate.setUTCHours(parseInt(hours), parseInt(minutes), 0, 0);
             clockOutTimestamp = clockOutDate.toISOString();
         }
         
