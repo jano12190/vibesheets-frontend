@@ -1,5 +1,6 @@
 let clockStatus = 'out';
 let currentUser = null;
+let periodSelectInitialized = false;
 
 // Initialize dashboard when page loads
 document.addEventListener('DOMContentLoaded', function() {
@@ -24,9 +25,15 @@ async function initializeDashboard() {
     // Load initial data
     await Promise.all([
         loadClockStatus(),
-        loadMonthlyHours(),
+        loadHours(), // Load today's hours by default
         loadTimeEntries()
     ]);
+    
+    // Set default hours period to today
+    const hoursPeriodSelect = document.getElementById('hoursPeriodSelect');
+    if (hoursPeriodSelect) {
+        hoursPeriodSelect.value = 'today';
+    }
     
     // Setup period select options
     await setupPeriodSelect();
@@ -102,8 +109,12 @@ async function clockIn() {
         if (response.ok) {
             clockStatus = 'in';
             updateClockButtons();
+            // Get current hours period selection
+            const hoursPeriodSelect = document.getElementById('hoursPeriodSelect');
+            const currentPeriod = hoursPeriodSelect ? hoursPeriodSelect.value : 'today';
+            
             await Promise.all([
-                loadMonthlyHours(),
+                loadHours(currentPeriod),
                 loadTimeEntries()
             ]);
         } else {
@@ -126,8 +137,12 @@ async function clockOut() {
         if (response.ok) {
             clockStatus = 'out';
             updateClockButtons();
+            // Get current hours period selection
+            const hoursPeriodSelect = document.getElementById('hoursPeriodSelect');
+            const currentPeriod = hoursPeriodSelect ? hoursPeriodSelect.value : 'today';
+            
             await Promise.all([
-                loadMonthlyHours(),
+                loadHours(currentPeriod),
                 loadTimeEntries()
             ]);
         } else {
@@ -140,14 +155,37 @@ async function clockOut() {
     }
 }
 
-// Load monthly hours
-async function loadMonthlyHours() {
+// Load hours for selected period
+async function loadHours(period = 'today') {
     try {
+        let startDate, endDate, labelText;
         const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
         
-        const response = await apiCall(`/timesheets?start_date=${formatDate(startOfMonth)}&end_date=${formatDate(endOfMonth)}`, 'GET');
+        switch (period) {
+            case 'today':
+                startDate = endDate = formatDate(now);
+                labelText = 'Today';
+                break;
+            case 'this-week':
+                const startOfWeek = new Date(now);
+                startOfWeek.setDate(now.getDate() - now.getDay());
+                const endOfWeek = new Date(startOfWeek);
+                endOfWeek.setDate(startOfWeek.getDate() + 6);
+                startDate = formatDate(startOfWeek);
+                endDate = formatDate(endOfWeek);
+                labelText = 'This Week';
+                break;
+            case 'this-month':
+            default:
+                const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                startDate = formatDate(startOfMonth);
+                endDate = formatDate(endOfMonth);
+                labelText = 'This Month';
+                break;
+        }
+        
+        const response = await apiCall(`/timesheets?start_date=${startDate}&end_date=${endDate}`, 'GET');
         
         if (response.ok) {
             const data = await response.json();
@@ -179,11 +217,13 @@ async function loadMonthlyHours() {
                 totalHours = data.totalHours;
             }
             
-            document.getElementById('monthlyHours').textContent = totalHours.toFixed(2) + 'h';
+            document.getElementById('hoursDisplay').textContent = totalHours.toFixed(2) + 'h';
+            document.getElementById('hoursLabel').textContent = labelText;
         }
     } catch (error) {
-        console.error('Failed to load monthly hours:', error);
-        document.getElementById('monthlyHours').textContent = '0.00h';
+        console.error('Failed to load hours:', error);
+        document.getElementById('hoursDisplay').textContent = '0.00h';
+        document.getElementById('hoursLabel').textContent = 'Total Hours';
     }
 }
 
@@ -314,11 +354,20 @@ function displayTimeEntries(data) {
 
 // Setup period select options based on user's time entries
 async function setupPeriodSelect() {
+    if (periodSelectInitialized) {
+        return; // Already initialized, don't run again
+    }
+    
     const select = document.getElementById('periodSelect');
     const optgroup = select.querySelector('optgroup[label="Available Months"]');
     
     // Clear existing options to prevent duplicates
-    optgroup.innerHTML = '';
+    if (optgroup) {
+        optgroup.innerHTML = '';
+    } else {
+        console.error('Available Months optgroup not found');
+        return;
+    }
     
     const months = [
         'January', 'February', 'March', 'April', 'May', 'June',
@@ -381,6 +430,8 @@ async function setupPeriodSelect() {
                 optgroup.appendChild(option);
             }
         }
+        
+        periodSelectInitialized = true;
     } catch (error) {
         console.error('Failed to setup period select:', error);
         // Fallback to basic setup - only current month
@@ -393,6 +444,8 @@ async function setupPeriodSelect() {
         option.textContent = `${months[currentMonth]} ${currentYear}`;
         optgroup.appendChild(option);
     }
+    
+    periodSelectInitialized = true;
 }
 
 // Handle period change
@@ -404,6 +457,14 @@ function handlePeriodChange() {
         dateRangeInputs.style.display = 'flex';
     } else {
         dateRangeInputs.style.display = 'none';
+    }
+}
+
+// Handle hours period change
+function handleHoursPeriodChange() {
+    const select = document.getElementById('hoursPeriodSelect');
+    if (select && select.value) {
+        loadHours(select.value);
     }
 }
 
@@ -535,7 +596,11 @@ async function apiCall(endpoint, method, body) {
 
 // Utility functions
 function formatDate(date) {
-    return date.toISOString().split('T')[0];
+    // Use local timezone to avoid date shifting issues
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 
 function formatDateTime(timestamp) {
@@ -711,8 +776,12 @@ async function updateTimeEntryTimes(entryId, clockInTime, clockOutTime, dateText
         
         if (response.ok) {
             // Refresh data after successful update
+            // Get current hours period selection
+            const hoursPeriodSelect = document.getElementById('hoursPeriodSelect');
+            const currentPeriod = hoursPeriodSelect ? hoursPeriodSelect.value : 'today';
+            
             await Promise.all([
-                loadMonthlyHours(),
+                loadHours(currentPeriod),
                 loadTimeEntries()
             ]);
         } else {

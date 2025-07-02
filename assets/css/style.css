@@ -3,12 +3,12 @@ body {
     padding: 0;
     font-family: 'Segoe UI', Arial, sans-serif;
     background: linear-gradient(135deg, #43cea2, #185a9d);
-    height: 100vh;
+    min-height: 100vh;
     display: flex;
     justify-content: center;
     align-items: center;
     color: #fff;
-    overflow: hidden;
+    overflow-x: hidden;
 }
 
 .logo {
@@ -203,9 +203,12 @@ body {
 }
 
 /* Mobile responsiveness */
-@media (max-width: 480px) {
+@media (max-width: 768px) {
     body {
-        padding: 20px;
+        padding: 15px;
+        min-height: 100vh;
+        align-items: flex-start;
+        padding-top: 60px;
     }
     
     .logo {
@@ -221,23 +224,56 @@ body {
         width: 100%;
         max-width: none;
         padding: 30px 25px;
-        margin-top: 20px;
+        margin: 0;
     }
     
     .login-container h1 {
-        font-size: 24px;
+        font-size: 26px;
         margin-bottom: 25px;
     }
     
     .login-btn {
-        padding: 15px 20px;
+        padding: 16px 20px;
         font-size: 16px;
-        margin: 10px 0;
+        margin: 12px 0;
     }
     
     .social-icon {
         margin-right: 10px;
         font-size: 16px;
+    }
+    
+    .wave {
+        height: 120px;
+        background-size: 1000px 120px;
+    }
+    
+    .wave:before {
+        height: 120px;
+        background-size: 1000px 120px;
+        bottom: 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    body {
+        padding: 10px;
+        padding-top: 40px;
+    }
+    
+    .login-container {
+        padding: 25px 20px;
+    }
+    
+    .login-container h1 {
+        font-size: 24px;
+        margin-bottom: 20px;
+    }
+    
+    .login-btn {
+        padding: 15px 18px;
+        font-size: 15px;
+        margin: 10px 0;
     }
     
     .wave {
@@ -248,21 +284,34 @@ body {
     .wave:before {
         height: 100px;
         background-size: 800px 100px;
-        bottom: 10px;
+        bottom: 8px;
     }
 }
 
 @media (max-width: 360px) {
+    body {
+        padding: 8px;
+        padding-top: 30px;
+    }
+    
     .login-container {
-        padding: 25px 20px;
+        padding: 20px 16px;
     }
     
     .login-container h1 {
         font-size: 22px;
+        margin-bottom: 18px;
     }
     
     .login-btn {
-        padding: 14px 18px;
+        padding: 14px 16px;
         font-size: 15px;
+        margin: 8px 0;
+    }
+    
+    .logo {
+        padding: 10px 18px;
+        font-size: 16px;
+        margin-bottom: 25px;
     }
 }
