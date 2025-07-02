@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vibesheets Dashboard</title>
+    <!-- Add Google Fonts to match login -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/auth0-js/9.23.2/auth0.min.js"></script>
+    <!-- Link to your CSS file -->
+    <link rel="stylesheet" href="css/dashboard.css">
+    <!-- Link to JavaScript files -->
+    <script src="js/auth.js"></script>
+    <script src="js/dashboard.js"></script>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">Vibesheets</div>
+        <div class="user-info">
+            <span id="userDisplay">Loading...</span>
+            <button class="logout-btn" onclick="logout()">
+                <img src="exit.png" alt="Exit" style="width: 16px; height: 16px; margin-right: 6px; vertical-align: text-bottom; filter: brightness(0) invert(1);">
+                Logout
+            </button>
+        </div>
+    </div>
+
+    <div class="dashboard-grid">
+        <div class="card current-time-card">
+            <h2>Current Time</h2>
+            <div class="time-display" id="currentTime">--:--:--</div>
+            <div class="date-display" id="currentDate">Loading...</div>
+            <!-- Both buttons with proper visibility logic -->
+            <div class="clock-button-container">
+                <button class="clock-in-btn" onclick="clockIn()" id="clockInBtn">Clock In</button>
+                <button class="clock-out-btn" onclick="clockOut()" id="clockOutBtn" style="display: none;">Clock Out</button>
+            </div>
+        </div>
+
+        <div class="card this-month-card">
+            <h2 id="hoursLabel">Hours Worked</h2>
+            <select class="hours-period-select" id="hoursPeriodSelect" onchange="handleHoursPeriodChange()">
+                <option value="today">Today</option>
+                <option value="this-week">This Week</option>
+                <option value="this-month">This Month</option>
+            </select>
+            <div class="hours-display" id="hoursDisplay">0.00h</div>
+        </div>
+    </div>
+
+    <div class="card export-card">
+        <h2>Export Timesheet</h2>
+        <div class="export-controls">
+            <label for="periodSelect">Period:</label>
+            <select class="period-select" id="periodSelect" onchange="handlePeriodChange()">
+                <option value="">Select time period</option>
+                <optgroup label="Available Months">
+                    <!-- Options will be generated dynamically by JavaScript -->
+                </optgroup>
+                <optgroup label="Custom">
+                    <option value="custom">Custom Date Range...</option>
+                </optgroup>
+            </select>
+            <button class="export-btn" onclick="exportPDF()">
+                Export PDF
+            </button>
+        </div>
+        <div class="date-range-inputs" id="dateRangeInputs">
+            <label>From:</label>
+            <input type="date" class="date-input" id="startDate">
+            <label>To:</label>
+            <input type="date" class="date-input" id="endDate">
+        </div>
+    </div>
+
+    <div class="card time-entries-card">
+        <div class="time-entries-header">
+            <h2>Time Entries</h2>
+            <input type="date" class="date-input" id="dateFilter" title="Select date to view entries">
+        </div>
+        
+
+        <!-- Time entries will be populated dynamically by JavaScript -->
+        <div id="timeEntriesContainer">
+            <div class="loading-entries">Loading time entries...</div>
+        </div>
+    </div>
+
+    <div class="wave"></div>
+    
+    <!-- Mobile logout button -->
+    <button class="mobile-logout" onclick="logout()" style="display: none;">
+        <img src="exit.png" alt="Exit" style="width: 16px; height: 16px; filter: brightness(0) invert(1);">
+        Logout
+    </button>
+    
+    <script>
+        // Show mobile logout button only on mobile
+        function updateMobileLogout() {
+            const mobileLogout = document.querySelector('.mobile-logout');
+            if (window.innerWidth <= 768) {
+                mobileLogout.style.display = 'flex';
+            } else {
+                mobileLogout.style.display = 'none';
+            }
+        }
+        
+        // Check on load and resize
+        window.addEventListener('load', updateMobileLogout);
+        window.addEventListener('resize', updateMobileLogout);
+    </script>
+</body>
+</html>

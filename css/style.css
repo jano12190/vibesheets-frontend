@@ -116,6 +116,38 @@ body {
     font-size: 18px;
 }
 
+/* Login divider */
+.login-divider {
+    margin: 20px 0;
+    position: relative;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.login-divider span {
+    background: rgba(255, 255, 255, 0.15);
+    padding: 0 15px;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.8);
+    z-index: 1;
+    backdrop-filter: blur(10px);
+    border-radius: 4px;
+}
+
+.login-divider hr {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    border: none;
+    background: rgba(255, 255, 255, 0.2);
+    margin: 0;
+    transform: translateY(-50%);
+}
+
 .wave {
     position: fixed;
     bottom: 0;

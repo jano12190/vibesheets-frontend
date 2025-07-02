@@ -1,9 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VibeSheets - Timesheet Tracking</title>
     
     <!-- Add Google Fonts -->
@@ -16,10 +15,45 @@
     
     <!-- Add Font Awesome for social icons -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
-    <script type="module" crossorigin src="/assets/index-DK-xQhXp.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-D8b4DHJx.css">
-  </head>
-  <body>
-    <div id="root"></div>
-  </body>
+    
+    <!-- Main CSS -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="logo">Vibesheets</div>
+    
+    <div class="login-container">
+        <h1>Welcome Back</h1>
+        
+        <div id="loading" style="display: none;">
+            Logging in...
+        </div>
+        
+        <div id="login-buttons">
+            <button class="login-btn google-login" onclick="handleGoogleLogin()">
+                <i class="fab fa-google social-icon"></i> Sign In with Google
+            </button>
+            
+            <div class="login-divider">
+                <span>or</span>
+                <hr>
+            </div>
+            
+            <button class="login-btn auth0-login" onclick="handleAuth0Login()">
+                <i class="fas fa-envelope social-icon"></i> Sign In with Email
+            </button>
+            
+            <button class="login-btn auth0-signup" onclick="handleAuth0Signup()">
+                <i class="fas fa-user-plus social-icon"></i> Sign Up
+            </button>
+        </div>
+        
+        <div id="login-error"></div>
+    </div>
+
+    <div class="wave"></div>
+
+    <!-- Load authentication script -->
+    <script src="js/auth.js"></script>
+</body>
 </html>

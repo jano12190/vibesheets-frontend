@@ -966,23 +966,38 @@ async function deleteTimeEntry(entryId) {
         });
         
         if (response.ok) {
-            // Show success message briefly
-            const container = document.getElementById('timeEntriesContainer');
-            container.innerHTML = '<div style="color: #43cea2; text-align: center; padding: 20px;">✓ Time entry deleted successfully</div>';
+            // Find and remove the specific time entry element
+            const entryElement = document.querySelector(`[data-entry-id="${entryId}"]`);
+            if (entryElement) {
+                entryElement.style.transition = 'opacity 0.3s ease';
+                entryElement.style.opacity = '0';
+                setTimeout(() => {
+                    entryElement.remove();
+                    
+                    // Check if container is now empty
+                    const container = document.getElementById('timeEntriesContainer');
+                    const remainingEntries = container.querySelectorAll('.time-entry');
+                    if (remainingEntries.length === 0) {
+                        container.innerHTML = '<div class="no-entries">No time entries for this date.</div>';
+                    }
+                }, 300);
+            }
             
-            // Refresh data after showing success message
-            setTimeout(async () => {
-                const hoursPeriodSelect = document.getElementById('hoursPeriodSelect');
-                const currentPeriod = hoursPeriodSelect ? hoursPeriodSelect.value : 'today';
-                
-                await Promise.all([
-                    loadHours(currentPeriod),
-                    filterBySpecificDate() // Use current date filter instead of loadTimeEntries()
-                ]);
-            }, 1500);
+            // Update hours display without full reload
+            const hoursPeriodSelect = document.getElementById('hoursPeriodSelect');
+            const currentPeriod = hoursPeriodSelect ? hoursPeriodSelect.value : 'today';
+            loadHours(currentPeriod);
         } else {
-            const error = await response.json();
-            alert('Failed to delete time entry: ' + (error.message || 'Unknown error'));
+            let errorMessage = 'Unknown error';
+            try {
+                const error = await response.json();
+                errorMessage = error.message || error.error || `HTTP ${response.status}: ${response.statusText}`;
+            } catch (e) {
+                const responseText = await response.text();
+                errorMessage = responseText || `HTTP ${response.status}: ${response.statusText}`;
+            }
+            console.error('Delete API error:', { status: response.status, statusText: response.statusText, errorMessage });
+            alert('Failed to delete time entry: ' + errorMessage);
         }
     } catch (error) {
         console.error('Error deleting time entry:', error);
