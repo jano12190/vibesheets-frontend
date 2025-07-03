@@ -852,8 +852,12 @@ function cancelTimeEdit() {
         const entryTimesDiv = editForm.previousSibling;
         const editButton = editForm.parentNode.querySelector('.edit-hours-btn');
         
-        entryTimesDiv.style.display = 'block';
-        editButton.style.display = 'inline-block';
+        if (entryTimesDiv) {
+            entryTimesDiv.style.display = 'block';
+        }
+        if (editButton) {
+            editButton.style.display = 'inline-block';
+        }
         editForm.remove();
     }
 }
