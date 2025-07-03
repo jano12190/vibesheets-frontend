@@ -545,7 +545,7 @@ async function exportPDF() {
         const response = await apiCall('/export', 'POST', {
             start_date: startDate,
             end_date: endDate,
-            format: 'pdf'
+            format: 'csv'
         });
         
         // Reset button state
@@ -556,13 +556,13 @@ async function exportPDF() {
             // Check content type
             const contentType = response.headers.get('content-type');
             
-            if (contentType && contentType.includes('application/pdf')) {
-                // Handle direct PDF response
+            if (contentType && (contentType.includes('text/csv') || contentType.includes('application/csv'))) {
+                // Handle direct CSV response
                 const blob = await response.blob();
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `timesheet_${startDate}_to_${endDate}.pdf`;
+                a.download = `timesheet_${startDate}_to_${endDate}.csv`;
                 a.style.display = 'none';
                 document.body.appendChild(a);
                 a.click();
@@ -580,12 +580,12 @@ async function exportPDF() {
                     try {
                         jsonResponse = JSON.parse(text);
                     } catch (jsonError) {
-                        // Not JSON, treat as binary
-                        const blob = new Blob([text], { type: 'application/pdf' });
+                        // Not JSON, treat as CSV
+                        const blob = new Blob([text], { type: 'text/csv' });
                         const url = window.URL.createObjectURL(blob);
                         const a = document.createElement('a');
                         a.href = url;
-                        a.download = `timesheet_${startDate}_to_${endDate}.pdf`;
+                        a.download = `timesheet_${startDate}_to_${endDate}.csv`;
                         a.style.display = 'none';
                         document.body.appendChild(a);
                         a.click();
@@ -597,20 +597,15 @@ async function exportPDF() {
                         return;
                     }
                     
-                    // Check if it's a base64 encoded PDF in body
+                    // Check if it's CSV data in body
                     if (jsonResponse.body && typeof jsonResponse.body === 'string') {
                         try {
-                            // Decode base64 and create blob
-                            const binaryString = atob(jsonResponse.body);
-                            const bytes = new Uint8Array(binaryString.length);
-                            for (let i = 0; i < binaryString.length; i++) {
-                                bytes[i] = binaryString.charCodeAt(i);
-                            }
-                            const blob = new Blob([bytes], { type: 'application/pdf' });
+                            // Create CSV blob directly from text
+                            const blob = new Blob([jsonResponse.body], { type: 'text/csv' });
                             const url = window.URL.createObjectURL(blob);
                             const a = document.createElement('a');
                             a.href = url;
-                            a.download = `timesheet_${startDate}_to_${endDate}.pdf`;
+                            a.download = `timesheet_${startDate}_to_${endDate}.csv`;
                             a.style.display = 'none';
                             document.body.appendChild(a);
                             a.click();
@@ -619,9 +614,9 @@ async function exportPDF() {
                                 window.URL.revokeObjectURL(url);
                                 document.body.removeChild(a);
                             }, 100);
-                        } catch (base64Error) {
-                            console.error('Failed to decode base64 PDF:', base64Error);
-                            alert('Failed to download PDF. The file may be corrupted.');
+                        } catch (csvError) {
+                            console.error('Failed to process CSV:', csvError);
+                            alert('Failed to download CSV. The file may be corrupted.');
                         }
                     } else {
                         // Regular JSON response, not a file
