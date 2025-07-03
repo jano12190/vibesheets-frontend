@@ -700,6 +700,8 @@ async function filterBySpecificDate(date) {
 async function apiCall(endpoint, method, body) {
     const token = getAccessToken();
     if (!token) {
+        alert('Session expired. Please log in again.');
+        window.location.href = '/';
         throw new Error('No access token available');
     }
     
@@ -720,6 +722,20 @@ async function apiCall(endpoint, method, body) {
     const response = await fetch(`https://api.vibesheets.com${endpoint}`, options);
     
     console.log(`API Response: ${response.status} ${response.statusText}`);
+    
+    // Handle authentication errors
+    if (response.status === 401 || response.status === 403) {
+        console.error('Authentication failed - token likely expired');
+        alert('Your session has expired. Please log in again.');
+        // Clear expired tokens
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('id_token');
+        localStorage.removeItem('expires_at');
+        localStorage.removeItem('user');
+        // Redirect to login
+        window.location.href = '/';
+        throw new Error('Authentication failed');
+    }
     
     return response;
 }

@@ -169,13 +169,12 @@ function handleAuthCallback() {
         if (authResult && authResult.accessToken && authResult.idToken) {
             console.log('Successfully parsed tokens');
             
-            // Store tokens with extended expiration for persistent login
+            // Store tokens with proper expiration from Auth0
             localStorage.setItem('access_token', authResult.accessToken);
             localStorage.setItem('id_token', authResult.idToken);
             
-            // Set expiration to 30 days instead of default short period
-            const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000;
-            const expiresAt = new Date().getTime() + thirtyDaysInMs;
+            // Use the actual expiration time from Auth0 (typically 1 hour)
+            const expiresAt = new Date().getTime() + (authResult.expiresIn * 1000);
             localStorage.setItem('expires_at', JSON.stringify(expiresAt));
             
             // Get user info
@@ -217,24 +216,12 @@ function handleAuthCallback() {
     });
 }
 
-// Check if user is authenticated with extended expiration
+// Check if user is authenticated
 function isAuthenticated() {
     const expiresAt = JSON.parse(localStorage.getItem('expires_at') || '0');
     const accessToken = localStorage.getItem('access_token');
     
-    // If we have a token but it's close to expiring, try to extend the session
     if (accessToken && expiresAt) {
-        const timeUntilExpiry = expiresAt - new Date().getTime();
-        const oneDayInMs = 24 * 60 * 60 * 1000;
-        
-        // If token expires in less than a day, extend it
-        if (timeUntilExpiry > 0 && timeUntilExpiry < oneDayInMs) {
-            // Extend expiration by 30 days
-            const newExpiresAt = new Date().getTime() + (30 * oneDayInMs);
-            localStorage.setItem('expires_at', JSON.stringify(newExpiresAt));
-            return true;
-        }
-        
         return new Date().getTime() < expiresAt;
     }
     
