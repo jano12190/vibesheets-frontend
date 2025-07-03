@@ -124,12 +124,17 @@ async function clockIn() {
                 errorMessage = 'Failed to clock in: ' + (error.error || error.message || 'Unknown error');
             } catch (e) {
                 console.warn('Could not parse error response:', e);
+                errorMessage = `Failed to clock in: HTTP ${response.status} ${response.statusText}`;
             }
             alert(errorMessage);
         }
     } catch (error) {
         console.error('Clock in error:', error);
-        alert('Failed to clock in. Please try again.');
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            alert('Network error: Please check your internet connection and try again.');
+        } else {
+            alert('Failed to clock in. Please try again.');
+        }
     }
 }
 
@@ -158,12 +163,17 @@ async function clockOut() {
                 errorMessage = 'Failed to clock out: ' + (error.error || error.message || 'Unknown error');
             } catch (e) {
                 console.warn('Could not parse error response:', e);
+                errorMessage = `Failed to clock out: HTTP ${response.status} ${response.statusText}`;
             }
             alert(errorMessage);
         }
     } catch (error) {
         console.error('Clock out error:', error);
-        alert('Failed to clock out. Please try again.');
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            alert('Network error: Please check your internet connection and try again.');
+        } else {
+            alert('Failed to clock out. Please try again.');
+        }
     }
 }
 
@@ -749,8 +759,7 @@ function formatTimeOnly(timestamp) {
     return date.toLocaleTimeString('en-US', {
         hour: '2-digit',
         minute: '2-digit',
-        hour12: true,
-        timeZone: 'UTC'
+        hour12: true
     });
 }
 
