@@ -1,0 +1,19 @@
+# Force correct MIME types
+AddType text/html .html
+AddType text/css .css
+AddType application/javascript .js
+
+# Set default file
+DirectoryIndex index.html
+
+# Prevent downloads of JS and CSS files
+<FilesMatch "\.(js|css)$">
+    Header set Content-Type "text/plain"
+    Header unset Content-Disposition
+</FilesMatch>
+
+# Ensure HTML files are served as HTML
+<FilesMatch "\.html$">
+    Header set Content-Type "text/html; charset=utf-8"
+    Header unset Content-Disposition
+</FilesMatch>
