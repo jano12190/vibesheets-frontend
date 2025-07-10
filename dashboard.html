@@ -4,11 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vibesheets Dashboard</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="favicon.png?v=3">
+    <link rel="shortcut icon" type="image/x-icon" href="favicon.ico?v=3">
+    <link rel="apple-touch-icon" href="favicon.png?v=3">
     <!-- Add Google Fonts to match login -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/auth0-js/9.23.2/auth0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/auth0-js/9.23.2/auth0.min.js" 
+            crossorigin="anonymous"></script>
+    <!-- Security utilities -->
+    <script src="js/security.js"></script>
+    
+    <!-- Logging system -->
+    <script src="js/logger.js"></script>
+    
     <!-- Link to your CSS file -->
     <link rel="stylesheet" href="css/dashboard.css">
     <!-- Link to JavaScript files -->
@@ -64,7 +75,7 @@
                 </optgroup>
             </select>
             <button class="export-btn" onclick="exportPDF()">
-                Export PDF
+                Export CSV
             </button>
         </div>
         <div class="date-range-inputs" id="dateRangeInputs">
@@ -96,20 +107,30 @@
         Logout
     </button>
     
+    <!-- Desktop logout button -->
+    <button class="desktop-logout" onclick="logout()">
+        <img src="exit.png" alt="Exit" style="width: 16px; height: 16px; margin-right: 6px; vertical-align: text-bottom; filter: brightness(0) invert(1);">
+        Logout
+    </button>
+    
     <script>
-        // Show mobile logout button only on mobile
-        function updateMobileLogout() {
+        // Show mobile logout button only on mobile and desktop logout on desktop
+        function updateLogoutButtons() {
             const mobileLogout = document.querySelector('.mobile-logout');
+            const desktopLogout = document.querySelector('.desktop-logout');
+            
             if (window.innerWidth <= 768) {
                 mobileLogout.style.display = 'flex';
+                desktopLogout.style.display = 'none';
             } else {
                 mobileLogout.style.display = 'none';
+                desktopLogout.style.display = 'flex';
             }
         }
         
         // Check on load and resize
-        window.addEventListener('load', updateMobileLogout);
-        window.addEventListener('resize', updateMobileLogout);
+        window.addEventListener('load', updateLogoutButtons);
+        window.addEventListener('resize', updateLogoutButtons);
     </script>
 </body>
 </html>

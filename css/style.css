@@ -122,30 +122,33 @@ body {
     position: relative;
     text-align: center;
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     justify-content: center;
+    height: 40px;
 }
 
 .login-divider span {
-    background: rgba(255, 255, 255, 0.15);
+    background: transparent;
     padding: 0 15px;
     font-size: 14px;
     color: rgba(255, 255, 255, 0.8);
-    z-index: 1;
-    backdrop-filter: blur(10px);
-    border-radius: 4px;
+    z-index: 2;
+    position: absolute;
+    top: 25%;
+    left: 50%;
+    transform: translate(-50%, -50%);
 }
 
 .login-divider hr {
     position: absolute;
-    top: 50%;
+    bottom: 0;
     left: 0;
     right: 0;
     height: 1px;
     border: none;
     background: rgba(255, 255, 255, 0.2);
     margin: 0;
-    transform: translateY(-50%);
+    z-index: 1;
 }
 
 .wave {
@@ -237,41 +240,48 @@ body {
 /* Mobile responsiveness */
 @media (max-width: 768px) {
     body {
-        padding: 15px;
+        padding: 10px;
+        height: 100vh;
         min-height: 100vh;
+        max-height: 100vh;
         align-items: center;
         flex-direction: column;
         justify-content: center;
-        padding-top: 15px;
+        overflow: hidden;
+        gap: 20px;
     }
     
     .logo {
         position: static;
-        margin: 0 auto 30px;
+        margin: 0;
         display: block;
         width: fit-content;
         padding: 12px 24px;
         font-size: 18px;
         order: 1;
+        flex-shrink: 0;
     }
     
     .login-container {
-        width: 90%;
-        max-width: 400px;
-        padding: 30px 25px;
+        width: calc(100% - 20px);
+        max-width: 350px;
+        padding: 20px 20px;
         margin: 0;
         order: 2;
+        flex-shrink: 1;
+        min-height: 0;
+        overflow: hidden;
     }
     
     .login-container h1 {
-        font-size: 26px;
-        margin-bottom: 25px;
+        font-size: 22px;
+        margin-bottom: 20px;
     }
     
     .login-btn {
-        padding: 16px 20px;
-        font-size: 16px;
-        margin: 12px 0;
+        padding: 14px 18px;
+        font-size: 15px;
+        margin: 10px 0;
     }
     
     .social-icon {
@@ -293,23 +303,30 @@ body {
 
 @media (max-width: 480px) {
     body {
-        padding: 10px;
-        padding-top: 40px;
+        padding: 8px;
+        gap: 15px;
+        overflow: hidden;
+    }
+    
+    .logo {
+        padding: 12px 24px;
+        font-size: 18px;
     }
     
     .login-container {
-        padding: 25px 20px;
+        width: calc(100% - 16px);
+        padding: 18px 16px;
     }
     
     .login-container h1 {
-        font-size: 24px;
-        margin-bottom: 20px;
+        font-size: 20px;
+        margin-bottom: 15px;
     }
     
     .login-btn {
-        padding: 15px 18px;
-        font-size: 15px;
-        margin: 10px 0;
+        padding: 12px 16px;
+        font-size: 14px;
+        margin: 8px 0;
     }
     
     .wave {
@@ -326,23 +343,30 @@ body {
 
 @media (max-width: 360px) {
     body {
-        padding: 8px;
-        padding-top: 30px;
+        padding: 5px;
+        gap: 10px;
+        overflow: hidden;
+    }
+    
+    .logo {
+        padding: 12px 24px;
+        font-size: 18px;
     }
     
     .login-container {
-        padding: 20px 16px;
+        width: calc(100% - 10px);
+        padding: 15px 12px;
     }
     
     .login-container h1 {
-        font-size: 22px;
-        margin-bottom: 18px;
+        font-size: 18px;
+        margin-bottom: 12px;
     }
     
     .login-btn {
-        padding: 14px 16px;
-        font-size: 15px;
-        margin: 8px 0;
+        padding: 10px 14px;
+        font-size: 13px;
+        margin: 6px 0;
     }
     
     .logo {

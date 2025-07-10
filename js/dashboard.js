@@ -25,8 +25,8 @@ async function initializeDashboard() {
     // Load initial data
     await Promise.all([
         loadClockStatus(),
-        loadHours(), // Load today's hours by default
-        loadTimeEntries()
+        loadHours() // Load today's hours by default
+        // loadTimeEntries() - will be called by setupDateFilter
     ]);
     
     // Set default hours period to today
@@ -115,7 +115,7 @@ async function clockIn() {
             
             await Promise.all([
                 loadHours(currentPeriod),
-                loadTimeEntries()
+                filterBySpecificDate() // Reload current date's entries
             ]);
         } else {
             let errorMessage = 'Failed to clock in. Please try again.';
@@ -154,7 +154,7 @@ async function clockOut() {
             
             await Promise.all([
                 loadHours(currentPeriod),
-                loadTimeEntries()
+                filterBySpecificDate() // Reload current date's entries
             ]);
         } else {
             let errorMessage = 'Failed to clock out. Please try again.';
@@ -249,23 +249,30 @@ async function loadHours(period = 'today') {
     }
 }
 
-// Load time entries (default to today)
+// Load time entries (default to today's date)
 async function loadTimeEntries() {
     try {
-        // Default to today's entries
-        const today = formatDate(new Date());
-        const response = await apiCall(`/timesheets?start_date=${today}&end_date=${today}`, 'GET');
+        // Default to today's entries only
+        const today = new Date();
+        const todayStr = formatDate(today);
+        
+        const response = await apiCall(`/timesheets?start_date=${todayStr}&end_date=${todayStr}`, 'GET');
         
         if (response.ok) {
             const data = await response.json();
+            console.log('=== API RESPONSE FOR TIME ENTRIES ===');
+            console.log('Full response:', data);
+            
             // Handle both possible response formats
             const entries = data.entries || data.timesheets || [];
+            console.log('Entries to display:', entries);
+            
             displayTimeEntries(entries);
             
             // Set the date filter to today's date by default
             const dateFilter = document.getElementById('dateFilter');
             if (dateFilter) {
-                dateFilter.value = formatDate(new Date());
+                dateFilter.value = todayStr;
             }
         }
     } catch (error) {
@@ -277,6 +284,8 @@ async function loadTimeEntries() {
 // Display time entries  
 function displayTimeEntries(data) {
     const container = document.getElementById('timeEntriesContainer');
+    const dateFilter = document.getElementById('dateFilter');
+    const selectedDate = dateFilter ? dateFilter.value : formatDate(new Date());
     
     // Handle both formats: direct entries array or timesheets grouped by date
     let entries = [];
@@ -290,8 +299,16 @@ function displayTimeEntries(data) {
         }
     }
     
+    // Filter entries to only show the selected date
+    if (selectedDate) {
+        entries = entries.filter(entry => {
+            const entryDate = entry.date || entry.timestamp.split('T')[0];
+            return entryDate === selectedDate;
+        });
+    }
+    
     if (!entries.length) {
-        container.innerHTML = '<div class="no-entries">No time entries found</div>';
+        container.innerHTML = `<div class="no-entries">No time entries found for ${selectedDate ? formatDateOnly(selectedDate) : 'selected date'}</div>`;
         return;
     }
     
@@ -305,6 +322,7 @@ function displayTimeEntries(data) {
         entriesByDate[date].push(entry);
     });
     
+    
     let entriesHtml = '';
     
     // Sort dates in descending order (most recent first)
@@ -315,54 +333,64 @@ function displayTimeEntries(data) {
             new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
         );
         
-        // Group clock-in and clock-out pairs more intelligently
+        // Create pairs by matching clock-out entries with their stored clock_in_time
         const pairs = [];
-        let i = 0;
+        const clockInEntries = dayEntries.filter(e => e.type === 'clock_in');
+        const clockOutEntries = dayEntries.filter(e => e.type === 'clock_out');
+        const usedClockIns = new Set();
         
-        while (i < dayEntries.length) {
-            const entry = dayEntries[i];
+        // Process clock-out entries first (they have the stored clock_in_time reference)
+        clockOutEntries.forEach(clockOut => {
+            let matchedClockIn = null;
             
-            if (entry.type === 'clock_in') {
-                // Look for the next clock_out entry
-                let clockOutEntry = null;
-                let j = i + 1;
-                
-                while (j < dayEntries.length) {
-                    if (dayEntries[j].type === 'clock_out') {
-                        clockOutEntry = dayEntries[j];
-                        break;
-                    }
-                    j++;
-                }
-                
-                // Only show clock_in entries that have a corresponding clock_out
-                if (clockOutEntry) {
-                    pairs.push({ clockIn: entry, clockOut: clockOutEntry });
-                    // Skip to the position after the clock_out we just paired
-                    i = j + 1;
-                } else {
-                    // Incomplete clock_in without clock_out - skip it unless it's the most recent entry
-                    const isCurrentlyWorking = i === dayEntries.length - 1 && entry.date === formatDate(new Date());
-                    if (isCurrentlyWorking) {
-                        pairs.push({ clockIn: entry, clockOut: null });
-                    }
-                    i++;
-                }
-            } else if (entry.type === 'clock_out') {
-                // Orphaned clock_out without prior clock_in - only show if it has valid hours
-                if (entry.hours && entry.hours > 0) {
-                    pairs.push({ clockIn: null, clockOut: entry });
-                }
-                i++;
+            if (clockOut.clock_in_time) {
+                // Find the exact clock-in entry that matches the stored clock_in_time
+                matchedClockIn = clockInEntries.find(clockIn => 
+                    clockIn.timestamp === clockOut.clock_in_time && !usedClockIns.has(clockIn.timestamp)
+                );
+            }
+            
+            if (matchedClockIn) {
+                usedClockIns.add(matchedClockIn.timestamp);
+                pairs.push({ clockIn: matchedClockIn, clockOut: clockOut });
             } else {
-                i++;
+                // This shouldn't happen, but if clock_in_time doesn't match any actual clock-in, skip it
+                console.warn('Clock-out entry has no matching clock-in:', clockOut);
+            }
+        });
+        
+        // Only show active clock-in if user is currently clocked in
+        if (clockStatus === 'in') {
+            const today = formatDate(new Date());
+            const unusedClockIns = clockInEntries.filter(e => !usedClockIns.has(e.timestamp) && e.date === today);
+            if (unusedClockIns.length > 0) {
+                const mostRecentClockIn = unusedClockIns.sort((a, b) => 
+                    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+                )[0];
+                pairs.push({ clockIn: mostRecentClockIn, clockOut: null });
             }
         }
         
+        // Sort pairs by clock-out time (most recent first), then by clock-in time
+        pairs.sort((a, b) => {
+            const timeA = a.clockOut ? new Date(a.clockOut.timestamp) : (a.clockIn ? new Date(a.clockIn.timestamp) : new Date(0));
+            const timeB = b.clockOut ? new Date(b.clockOut.timestamp) : (b.clockIn ? new Date(b.clockIn.timestamp) : new Date(0));
+            return timeB.getTime() - timeA.getTime(); // Most recent first
+        });
+        
         // Generate HTML for each pair
         pairs.forEach((pair, index) => {
+            console.log('=== PROCESSING PAIR FOR DISPLAY ===');
+            console.log('Pair:', pair);
+            console.log('Clock-in timestamp:', pair.clockIn?.timestamp);
+            console.log('Clock-out timestamp:', pair.clockOut?.timestamp);
+            
             const clockInTime = pair.clockIn ? formatTimeOnly(pair.clockIn.timestamp) : '--:--';
             const clockOutTime = pair.clockOut ? formatTimeOnly(pair.clockOut.timestamp) : '--:--';
+            
+            console.log('Formatted clock-in time:', clockInTime);
+            console.log('Formatted clock-out time:', clockOutTime);
+            
             const duration = calculateDuration(pair.clockIn, pair.clockOut);
             const displayDate = formatDateOnly(date);
             const hours = pair.clockOut ? (pair.clockOut.hours || 0) : 0;
@@ -395,20 +423,24 @@ function displayTimeEntries(data) {
 
 // Setup period select options based on user's time entries
 async function setupPeriodSelect() {
-    if (periodSelectInitialized) {
-        return; // Already initialized, don't run again
-    }
-    
     const select = document.getElementById('periodSelect');
+    if (!select) return;
+    
     const optgroup = select.querySelector('optgroup[label="Available Months"]');
     
-    // Clear existing options to prevent duplicates
+    // Always clear existing options to prevent duplicates
     if (optgroup) {
         optgroup.innerHTML = '';
     } else {
         console.error('Available Months optgroup not found');
         return;
     }
+    
+    // Check if we're already building this to prevent race conditions
+    if (select.dataset.building === 'true') {
+        return;
+    }
+    select.dataset.building = 'true';
     
     const months = [
         'January', 'February', 'March', 'April', 'May', 'June',
@@ -446,15 +478,21 @@ async function setupPeriodSelect() {
                 const endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1); // Up to current month only
                 
                 let currentMonth = new Date(earliestDate.getFullYear(), earliestDate.getMonth(), 1);
+                const seenMonths = new Set(); // Track months to prevent duplicates
                 
                 while (currentMonth < endDate) {
                     const year = currentMonth.getFullYear();
                     const month = currentMonth.getMonth();
+                    const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
                     
-                    const option = document.createElement('option');
-                    option.value = `${year}-${String(month + 1).padStart(2, '0')}`;
-                    option.textContent = `${months[month]} ${year}`;
-                    optgroup.appendChild(option);
+                    // Only add if we haven't seen this month before
+                    if (!seenMonths.has(monthKey)) {
+                        seenMonths.add(monthKey);
+                        const option = document.createElement('option');
+                        option.value = monthKey;
+                        option.textContent = `${months[month]} ${year}`;
+                        optgroup.appendChild(option);
+                    }
                     
                     // Move to next month
                     currentMonth.setMonth(currentMonth.getMonth() + 1);
@@ -465,14 +503,13 @@ async function setupPeriodSelect() {
                 const currentYear = currentDate.getFullYear();
                 const currentMonth = currentDate.getMonth();
                 
+                const monthKey = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
                 const option = document.createElement('option');
-                option.value = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+                option.value = monthKey;
                 option.textContent = `${months[currentMonth]} ${currentYear}`;
                 optgroup.appendChild(option);
             }
         }
-        
-        periodSelectInitialized = true;
     } catch (error) {
         console.error('Failed to setup period select:', error);
         // Fallback to basic setup - only current month
@@ -480,13 +517,15 @@ async function setupPeriodSelect() {
         const currentYear = currentDate.getFullYear();
         const currentMonth = currentDate.getMonth();
         
+        const monthKey = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
         const option = document.createElement('option');
-        option.value = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+        option.value = monthKey;
         option.textContent = `${months[currentMonth]} ${currentYear}`;
         optgroup.appendChild(option);
+    } finally {
+        // Always reset the building flag
+        select.dataset.building = 'false';
     }
-    
-    periodSelectInitialized = true;
 }
 
 // Handle period change
@@ -662,6 +701,9 @@ function setupDateFilter() {
             filterBySpecificDate(this.value);
         }
     });
+    
+    // Load today's entries by default
+    filterBySpecificDate(formatDate(new Date()));
 }
 
 
@@ -696,13 +738,34 @@ async function filterBySpecificDate(date) {
     }
 }
 
-// API call helper function
+// API call helper function with security enhancements
 async function apiCall(endpoint, method, body) {
+    // Security checks
+    if (window.securityManager) {
+        // Check rate limiting
+        if (window.securityManager.isRateLimited(endpoint)) {
+            throw new Error('Too many requests. Please wait before trying again.');
+        }
+        
+        // Validate input data
+        if (body && window.securityManager.detectSuspiciousActivity(method + ' ' + endpoint, body)) {
+            throw new Error('Invalid request data detected.');
+        }
+    }
+    
     const token = getAccessToken();
     if (!token) {
         alert('Session expired. Please log in again.');
         window.location.href = '/';
         throw new Error('No access token available');
+    }
+    
+    // Validate JWT format
+    if (window.securityManager && !window.securityManager.validateJWTFormat(token)) {
+        console.error('Invalid token format detected');
+        alert('Invalid session. Please log in again.');
+        logout();
+        throw new Error('Invalid token format');
     }
     
     const options = {
@@ -717,27 +780,103 @@ async function apiCall(endpoint, method, body) {
         options.body = JSON.stringify(body);
     }
     
-    console.log(`API Call: ${method} ${endpoint}`, body ? body : 'no body');
+    console.log(`API Call: ${method} ${endpoint}`, body ? '[BODY_REDACTED]' : 'no body');
     
-    const response = await fetch(`https://api.vibesheets.com${endpoint}`, options);
+    // Track request timing for monitoring
+    const startTime = performance.now();
     
-    console.log(`API Response: ${response.status} ${response.statusText}`);
-    
-    // Handle authentication errors
-    if (response.status === 401 || response.status === 403) {
-        console.error('Authentication failed - token likely expired');
-        alert('Your session has expired. Please log in again.');
-        // Clear expired tokens
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('id_token');
-        localStorage.removeItem('expires_at');
-        localStorage.removeItem('user');
-        // Redirect to login
-        window.location.href = '/';
-        throw new Error('Authentication failed');
+    try {
+        const response = await fetch(`https://api.vibesheets.com${endpoint}`, options);
+        
+        const endTime = performance.now();
+        const duration = endTime - startTime;
+        
+        console.log(`API Response: ${response.status} ${response.statusText} (${duration.toFixed(2)}ms)`);
+        
+        // Log API call with logger
+        if (window.logger) {
+            window.logger.trackAPICall(endpoint, method, duration, response.status);
+        }
+        
+        // Log slow requests
+        if (duration > 5000) {
+            console.warn(`Slow API request detected: ${endpoint} took ${duration.toFixed(2)}ms`);
+            if (window.logger) {
+                window.logger.warn('Slow API Request', {
+                    endpoint,
+                    method,
+                    duration,
+                    status: response.status
+                });
+            }
+        }
+        
+        // Handle authentication errors
+        if (response.status === 401 || response.status === 403) {
+            console.error('Authentication failed - token likely expired');
+            
+            // Log security event
+            if (window.securityManager) {
+                window.securityManager.logSecurityEvent('auth_failure', {
+                    endpoint,
+                    status: response.status,
+                    timestamp: new Date().toISOString()
+                });
+            }
+            
+            // Log with logger
+            if (window.logger) {
+                window.logger.error('Authentication Failed', {
+                    endpoint,
+                    method,
+                    status: response.status,
+                    duration
+                });
+            }
+            
+            alert('Your session has expired. Please log in again.');
+            logout();
+            throw new Error('Authentication failed');
+        }
+        
+        // Handle server errors
+        if (response.status >= 500) {
+            const errorMsg = `Server error: ${response.status} ${response.statusText}`;
+            console.error(errorMsg);
+            
+            if (window.logger) {
+                window.logger.error('Server Error', {
+                    endpoint,
+                    method,
+                    status: response.status,
+                    statusText: response.statusText,
+                    duration
+                });
+            }
+            
+            throw new Error('Server error. Please try again later.');
+        }
+        
+        return response;
+    } catch (error) {
+        const endTime = performance.now();
+        const duration = endTime - startTime;
+        
+        console.error(`API Error: ${error.message} (${duration.toFixed(2)}ms)`);
+        
+        // Log network errors
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            if (window.securityManager) {
+                window.securityManager.logSecurityEvent('network_error', {
+                    endpoint,
+                    error: error.message,
+                    timestamp: new Date().toISOString()
+                });
+            }
+        }
+        
+        throw error;
     }
-    
-    return response;
 }
 
 // Utility functions
@@ -767,6 +906,12 @@ function formatDateTime(timestamp) {
 
 function formatTimeOnly(timestamp) {
     const date = new Date(timestamp);
+    // Ensure we're working with a valid date
+    if (isNaN(date.getTime())) {
+        return '--:--';
+    }
+    
+    // Format time in user's local timezone
     return date.toLocaleTimeString('en-US', {
         hour: '2-digit',
         minute: '2-digit',
@@ -841,17 +986,63 @@ function saveTimeEdit(entryId) {
     const clockInTime = clockInInput.value;
     const clockOutTime = clockOutInput.value;
     
+    // Input validation
     if (!clockInTime && !clockOutTime) {
         alert('Please enter at least one time.');
         return;
     }
     
+    // Validate time formats using security manager
+    if (window.securityManager) {
+        if (clockInTime && !window.securityManager.validateTime(clockInTime)) {
+            alert('Invalid clock in time format. Please use HH:MM format.');
+            return;
+        }
+        
+        if (clockOutTime && !window.securityManager.validateTime(clockOutTime)) {
+            alert('Invalid clock out time format. Please use HH:MM format.');
+            return;
+        }
+    }
+    
+    // Validate logical time order
+    if (clockInTime && clockOutTime) {
+        const clockInDate = new Date(`2000-01-01T${clockInTime}:00`);
+        const clockOutDate = new Date(`2000-01-01T${clockOutTime}:00`);
+        
+        if (clockInDate >= clockOutDate) {
+            alert('Clock out time must be after clock in time.');
+            return;
+        }
+        
+        // Check for reasonable work duration (max 24 hours)
+        const diffHours = (clockOutDate - clockInDate) / (1000 * 60 * 60);
+        if (diffHours > 24) {
+            alert('Work duration cannot exceed 24 hours.');
+            return;
+        }
+    }
+    
+    // Sanitize entry ID
+    const sanitizedEntryId = window.securityManager ? 
+        window.securityManager.validateText(entryId, 100) : entryId;
+    
+    if (!sanitizedEntryId) {
+        alert('Invalid entry ID.');
+        return;
+    }
+    
     // Convert times to timestamps for the current date
-    const entryDiv = document.querySelector(`[data-entry-id="${entryId}"]`);
+    const entryDiv = document.querySelector(`[data-entry-id="${sanitizedEntryId}"]`);
+    if (!entryDiv) {
+        alert('Entry not found.');
+        return;
+    }
+    
     const dateText = entryDiv.querySelector('.entry-date').textContent;
     
     // Save to backend
-    updateTimeEntryTimes(entryId, clockInTime, clockOutTime, dateText);
+    updateTimeEntryTimes(sanitizedEntryId, clockInTime, clockOutTime, dateText);
     
     // Clean up edit form
     cancelTimeEdit();
@@ -912,14 +1103,14 @@ async function updateTimeEntryTimes(entryId, clockInTime, clockOutTime, dateText
         if (clockInTime) {
             const [hours, minutes] = clockInTime.split(':');
             const clockInDate = new Date(entryDate);
-            clockInDate.setUTCHours(parseInt(hours), parseInt(minutes), 0, 0);
+            clockInDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
             clockInTimestamp = clockInDate.toISOString();
         }
         
         if (clockOutTime) {
             const [hours, minutes] = clockOutTime.split(':');
             const clockOutDate = new Date(entryDate);
-            clockOutDate.setUTCHours(parseInt(hours), parseInt(minutes), 0, 0);
+            clockOutDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
             clockOutTimestamp = clockOutDate.toISOString();
         }
         
@@ -945,7 +1136,7 @@ async function updateTimeEntryTimes(entryId, clockInTime, clockOutTime, dateText
             
             await Promise.all([
                 loadHours(currentPeriod),
-                loadTimeEntries()
+                filterBySpecificDate() // Reload current date's entries
             ]);
         } else {
             const error = await response.json();

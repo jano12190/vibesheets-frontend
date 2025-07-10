@@ -33,7 +33,23 @@
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
         }
 
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-info span {
+            color: white;
+            font-weight: 500;
+            font-size: 16px;
+        }
+
         .logout-btn {
+            display: none;
+        }
+
+        .desktop-logout {
             background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(10px);
             color: white;
@@ -45,9 +61,14 @@
             font-weight: 500;
             transition: all 0.3s ease;
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+            display: none;
+            align-items: center;
+            gap: 8px;
+            margin: 40px auto 20px auto;
+            width: fit-content;
         }
 
-        .logout-btn:hover {
+        .desktop-logout:hover {
             background: rgba(255, 255, 255, 0.25);
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);

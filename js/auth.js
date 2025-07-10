@@ -177,6 +177,14 @@ function handleAuthCallback() {
             const expiresAt = new Date().getTime() + (authResult.expiresIn * 1000);
             localStorage.setItem('expires_at', JSON.stringify(expiresAt));
             
+            // Log successful authentication
+            if (window.logger) {
+                window.logger.info('User Authentication Successful', {
+                    expiresIn: authResult.expiresIn,
+                    tokenType: authResult.tokenType
+                });
+            }
+            
             // Get user info
             auth0Client.client.userInfo(authResult.accessToken, (err, user) => {
                 if (err) {
@@ -186,6 +194,15 @@ function handleAuthCallback() {
                 } else {
                     console.log('Got user info:', user);
                     localStorage.setItem('user', JSON.stringify(user));
+                    
+                    // Set user in logger
+                    if (window.logger) {
+                        window.logger.setUser(user.sub || user.email, {
+                            email: user.email,
+                            name: user.name,
+                            picture: user.picture
+                        });
+                    }
                 }
                 
                 // Clear the hash from URL to clean it up
